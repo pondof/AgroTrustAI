@@ -11,14 +11,10 @@ Execução: `pytest tests/contract/`.
 from __future__ import annotations
 
 import importlib
-import importlib.util
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-
-
-# ─── Loader dos mocks (paths com hífen exigem importlib) ─────────────────────
 
 
 def _load_mock(module_path: str) -> Any:
@@ -37,21 +33,12 @@ def gee_client() -> TestClient:
 
 @pytest.fixture(scope="module")
 def dataprev_client() -> TestClient:
-    # módulo dataprev (sem hífen)
     return TestClient(_load_mock("mocks.dataprev.app"))
 
 
 @pytest.fixture(scope="module")
 def open_finance_client() -> TestClient:
-    # diretório `open-finance` tem hífen — precisamos do importlib via loader
-    spec = importlib.util.spec_from_file_location(
-        "open_finance_app",
-        "mocks/open-finance/app.py",
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return TestClient(module.app)
+    return TestClient(_load_mock("mocks.open_finance.app"))
 
 
 # ─── SICAR ───────────────────────────────────────────────────────────────────

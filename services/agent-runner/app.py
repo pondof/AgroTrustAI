@@ -43,6 +43,14 @@ async def main() -> None:
         producer=producer,
         audit_repo=audit_repo,
     )
+
+    from core.config.settings import get_settings
+    from core.events.topics import create_topics
+    try:
+        create_topics(get_settings().kafka.bootstrap_servers)
+    except Exception as e:
+        logger.warning("kafka_topic_creation_skipped", error=str(e))
+
     await consumer.start()
 
     logger.info("agent_runner_ready")
