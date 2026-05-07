@@ -1,0 +1,280 @@
+openapi: 3.1.0
+info:
+  title: AgroTrust AI – API Gateway
+  description: |
+    Gateway central do sistema agêntico de subscrição de crédito rural.
+    Todos os endpoints (exceto /health e /metrics) exigem JWT Bearer.
+  version: 0.1.0
+  contact:
+    name: AgroTrust AI Team
+    email: dev@agrotrust.ai
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8000
+    description: Dev local
+  - url: https://staging.agrotrust.ai
+    description: Staging
+  - url: https://api.agrotrust.ai
+    description: Produção
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: subscriptions
+    description: Operações sobre dossiês de subscrição
+  - name: infra
+    description: Health/metrics
+
+paths:
+  /health:
+    get:
+      tags: [infra]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /metrics:
+    get:
+      tags: [infra]
+      summary: Métricas Prometheus
+      security: []
+      responses:
+        "200":
+          description: Texto Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/v1/subscriptions:
+    post:
+      tags: [subscriptions]
+      summary: Inicia novo dossiê de subscrição
+      operationId: createSubscription
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionRequest"
+      responses:
+        "202":
+          description: Dossiê iniciado (processamento assíncrono)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/subscriptions/{dossie_id}:
+    get:
+      tags: [subscriptions]
+      summary: Consulta status atual do dossiê
+      operationId: getSubscriptionStatus
+      parameters:
+        - $ref: "#/components/parameters/DossieId"
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Status atual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatusResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/subscriptions/{dossie_id}/audit-trail:
+    get:
+      tags: [subscriptions]
+      summary: Trilha de auditoria do dossiê (hash chain)
+      operationId: getSubscriptionAuditTrail
+      parameters:
+        - $ref: "#/components/parameters/DossieId"
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Trilha completa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditTrailResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    DossieId:
+      name: dossie_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^DOS-[A-F0-9]{12}$"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        service: { type: string }
+        topics_configured: { type: integer }
+
+    PropertyLocation:
+      type: object
+      required: [latitude, longitude, municipio, estado]
+      properties:
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        municipio: { type: string }
+        estado:
+          type: string
+          minLength: 2
+          maxLength: 2
+        biome:
+          type: string
+          nullable: true
+
+    SubscriptionRequest:
+      type: object
+      required:
+        - producer_cpf_hash
+        - car_number
+        - property_area_ha
+        - location
+        - credit_amount_brl
+        - credit_purpose
+        - requested_by
+      properties:
+        producer_cpf_hash:
+          type: string
+          minLength: 64
+          maxLength: 64
+          description: SHA-3-256 do CPF (nunca CPF em claro)
+        car_number: { type: string }
+        property_area_ha: { type: number, exclusiveMinimum: 0 }
+        location: { $ref: "#/components/schemas/PropertyLocation" }
+        credit_amount_brl: { type: number, exclusiveMinimum: 0 }
+        credit_purpose:
+          type: string
+          enum: [custeio, investimento, comercializacao]
+        requested_by: { type: string }
+
+    SubscriptionResponse:
+      type: object
+      required: [dossie_id, status, correlation_id, submitted_at]
+      properties:
+        dossie_id: { type: string }
+        status: { type: string }
+        correlation_id: { type: string, format: uuid }
+        submitted_at: { type: string, format: date-time }
+
+    SubscriptionStatusResponse:
+      type: object
+      required: [dossie_id, status]
+      properties:
+        dossie_id: { type: string }
+        status: { type: string }
+        last_event:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: number
+          nullable: true
+
+    AuditTrailEntry:
+      type: object
+      required: [event_id, timestamp, event_type, subject, outcome, entry_hash]
+      properties:
+        event_id: { type: string, format: uuid }
+        timestamp: { type: string, format: date-time }
+        event_type: { type: string }
+        subject: { type: string }
+        outcome:
+          type: string
+          enum: [success, failure, warning]
+        details:
+          type: object
+          additionalProperties: true
+        entry_hash: { type: string }
+
+    AuditTrailResponse:
+      type: object
+      required: [dossie_id, entries, total]
+      properties:
+        dossie_id: { type: string }
+        total: { type: integer, minimum: 0 }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/AuditTrailEntry" }
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+        correlation_id: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Requisição malformada
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Token ausente ou inválido
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Scope insuficiente
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UnprocessableEntity:
+      description: Validação Pydantic falhou
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServiceUnavailable:
+      description: Dependência indisponível
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

@@ -1,0 +1,178 @@
+openapi: 3.1.0
+info:
+  title: AgroTrust AI – Agente ESG
+  description: |
+    Agente ESG: análise de conformidade ambiental do produtor rural cruzando
+    SICAR/CAR, Google Earth Engine (NDVI/desmatamento) e credenciais
+    Dataprev DaaS. API interna – consumida apenas pelo Orchestrator.
+  version: 0.1.0
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://agent-esg:8010
+    description: Dev (docker network)
+  - url: https://agent-esg.staging.agrotrust.ai
+    description: Staging
+  - url: https://agent-esg.agrotrust.ai
+    description: Produção
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+
+  /api/v1/analyze:
+    post:
+      summary: Inicia análise ESG assíncrona
+      operationId: analyzeESG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ESGAnalyzeRequest" }
+      responses:
+        "202":
+          description: Job aceito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/status/{job_id}:
+    get:
+      summary: Consulta status do job ESG
+      operationId: getESGJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Status atual
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ESGJobStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ESGAnalyzeRequest:
+      type: object
+      required: [dossie_id, car_number, holder_did, correlation_id, tenant_id]
+      properties:
+        dossie_id: { type: string }
+        car_number: { type: string }
+        holder_did: { type: string }
+        correlation_id: { type: string, format: uuid }
+        tenant_id: { type: string }
+
+    JobAccepted:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [pending, running] }
+        submitted_at: { type: string, format: date-time }
+
+    XAIRationale:
+      type: object
+      additionalProperties: true
+      description: Racional estruturado da decisão (anti-death-by-AI)
+
+    ESGJobStatus:
+      type: object
+      required: [job_id, dossie_id, status]
+      properties:
+        job_id: { type: string }
+        dossie_id: { type: string }
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        car_status:
+          type: string
+          enum: [regular, pendente, cancelado, suspenso]
+          nullable: true
+        deforestation_detected:
+          type: boolean
+          nullable: true
+        deforestation_area_ha:
+          type: number
+          minimum: 0
+          nullable: true
+        gee_satellite_images_used:
+          type: integer
+          minimum: 0
+          nullable: true
+        vc_credential_valid:
+          type: boolean
+          nullable: true
+        compliance_status:
+          type: string
+          enum: [approved, rejected, pending_docs, warning]
+          nullable: true
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        xai_rationale:
+          allOf: [{ $ref: "#/components/schemas/XAIRationale" }]
+          nullable: true
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+  responses:
+    BadRequest:
+      description: Requisição malformada
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Unauthorized:
+      description: Token ausente ou inválido
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Forbidden:
+      description: Scope insuficiente
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    NotFound:
+      description: Job não encontrado
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    UnprocessableEntity:
+      description: Validação falhou
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    ServiceUnavailable:
+      description: API governamental indisponível
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }

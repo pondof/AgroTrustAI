@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agrotrust
+  labels:
+    app.kubernetes.io/name: agrotrust-ai
+    app.kubernetes.io/part-of: agrotrust-ai
+    environment: dev
+    compliance: lgpd-bacen-cmn
+    data-classification: restricted
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    description: "AgroTrust AI – namespace base com PSS restricted e Zero Trust por NetworkPolicy."
+    owner: "platform-team@agrotrust.ai"

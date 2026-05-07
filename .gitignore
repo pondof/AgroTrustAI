@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+*.egg
+
+# Testes / Cobertura
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Segurança – NUNCA versionadas
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+secrets/
+!secrets/.gitkeep
+
+# Docker
+docker/volumes/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

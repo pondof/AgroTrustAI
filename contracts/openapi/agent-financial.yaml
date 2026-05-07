@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: AgroTrust AI – Agente Financeiro
+  description: |
+    Agente Financeiro: cálculo do Trust Score+ a partir de dados Open Finance,
+    DTI, histórico de crédito rural e sazonalidade safra. API interna –
+    consumida apenas pelo Orchestrator.
+  version: 0.1.0
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://agent-financial:8011
+    description: Dev (docker network)
+  - url: https://agent-financial.staging.agrotrust.ai
+    description: Staging
+  - url: https://agent-financial.agrotrust.ai
+    description: Produção
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string } }
+
+  /api/v1/score:
+    post:
+      summary: Inicia cálculo Trust Score+ assíncrono
+      operationId: scoreFinancial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinancialScoreRequest" }
+      responses:
+        "202":
+          description: Job aceito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/status/{job_id}:
+    get:
+      summary: Consulta status do job financeiro
+      operationId: getFinancialJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Status atual
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinancialJobStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    FinancialScoreRequest:
+      type: object
+      required: [dossie_id, open_finance_consent_id, requested_amount_brl, correlation_id, tenant_id]
+      properties:
+        dossie_id: { type: string }
+        open_finance_consent_id: { type: string }
+        requested_amount_brl: { type: number, exclusiveMinimum: 0 }
+        correlation_id: { type: string, format: uuid }
+        tenant_id: { type: string }
+        months_of_history:
+          type: integer
+          minimum: 1
+          maximum: 24
+          default: 6
+
+    JobAccepted:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [pending, running] }
+        submitted_at: { type: string, format: date-time }
+
+    XAIRationale:
+      type: object
+      additionalProperties: true
+
+    FinancialJobStatus:
+      type: object
+      required: [job_id, dossie_id, status]
+      properties:
+        job_id: { type: string }
+        dossie_id: { type: string }
+        status: { type: string, enum: [pending, running, completed, failed] }
+        trust_score:
+          type: number
+          minimum: 0
+          maximum: 1000
+          nullable: true
+        open_finance_data_months:
+          type: integer
+          minimum: 0
+          nullable: true
+        avg_monthly_revenue_brl:
+          type: number
+          nullable: true
+        debt_to_income_ratio:
+          type: number
+          minimum: 0
+          nullable: true
+        existing_rural_credit_brl:
+          type: number
+          minimum: 0
+          nullable: true
+        recommended_credit_limit_brl:
+          type: number
+          minimum: 0
+          nullable: true
+        risk_tier:
+          type: string
+          enum: [A, B, C, D, E]
+          nullable: true
+        xai_rationale:
+          allOf: [{ $ref: "#/components/schemas/XAIRationale" }]
+          nullable: true
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+  responses:
+    BadRequest:
+      description: Requisição malformada
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Unauthorized:
+      description: Token ausente ou inválido
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Forbidden:
+      description: Scope insuficiente
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    NotFound:
+      description: Job não encontrado
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    UnprocessableEntity:
+      description: Validação falhou
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    ServiceUnavailable:
+      description: Open Finance indisponível
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }

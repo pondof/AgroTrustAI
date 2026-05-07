@@ -1,0 +1,56 @@
+# ============================================================================
+# AgroTrust AI – Pre-commit hooks
+# Instale: pip install pre-commit && pre-commit install
+# Atualize: pre-commit autoupdate
+# ============================================================================
+default_language_version:
+  python: python3.11
+
+repos:
+  # Higiene básica do repositório
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+      - id: check-json
+        exclude: ^\.vscode/
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: ["--branch", "main", "--branch", "master"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # Ruff – format + lint (substitui black + isort + flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.0
+    hooks:
+      - id: ruff-format
+      - id: ruff
+        args: ["--fix"]
+
+  # mypy – type checking estrito
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.7
+          - pydantic-settings>=2.2
+          - types-python-jose
+          - types-passlib
+        args: ["--ignore-missing-imports"]
+        exclude: ^(tests/|mocks/|services/)
+
+  # Detect secrets (chaves AWS, GCP, tokens, etc.)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: ^(\.env\.example|tests/|docker/init-db\.sql)$

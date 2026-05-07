@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+ARG MOCK_MODULE
+ARG MOCK_PORT=8000
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MOCK_MODULE=${MOCK_MODULE} \
+    MOCK_PORT=${MOCK_PORT}
+
+WORKDIR /app
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic pydantic-settings
+
+COPY core/ ./core/
+COPY mocks/ ./mocks/
+
+EXPOSE ${MOCK_PORT}
+
+CMD uvicorn ${MOCK_MODULE}:app \
+    --host 0.0.0.0 \
+    --port ${MOCK_PORT} \
+    --log-level info \
+    --access-log

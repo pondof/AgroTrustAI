@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: AgroTrust AI – Agente de Segurança
+  description: |
+    Agente de Segurança: KYC, biometria liveness, deepfake/voice-clone/digital-mask
+    detection e verificação de título fundiário em blockchain (Ubitquity).
+    API interna – consumida apenas pelo Orchestrator.
+  version: 0.1.0
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://agent-security:8012
+    description: Dev (docker network)
+  - url: https://agent-security.staging.agrotrust.ai
+    description: Staging
+  - url: https://agent-security.agrotrust.ai
+    description: Produção
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { status: { type: string } }
+
+  /api/v1/verify-identity:
+    post:
+      summary: Inicia verificação biométrica + KYC assíncrona
+      operationId: verifyIdentity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyIdentityRequest" }
+      responses:
+        "202":
+          description: Job aceito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+  /api/v1/verify-title:
+    post:
+      summary: Verifica título fundiário em blockchain
+      operationId: verifyTitle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyTitleRequest" }
+      responses:
+        "202":
+          description: Job aceito
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobAccepted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/v1/status/{job_id}:
+    get:
+      summary: Consulta status do job de segurança
+      operationId: getSecurityJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Status atual
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SecurityJobStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    VerifyIdentityRequest:
+      type: object
+      required:
+        - dossie_id
+        - holder_did
+        - biometric_payload_id
+        - correlation_id
+        - tenant_id
+      properties:
+        dossie_id: { type: string }
+        holder_did: { type: string }
+        biometric_payload_id:
+          type: string
+          description: ID do blob criptografado em storage seguro (nunca a imagem inline)
+        voice_payload_id:
+          type: string
+          nullable: true
+        correlation_id: { type: string, format: uuid }
+        tenant_id: { type: string }
+
+    VerifyTitleRequest:
+      type: object
+      required: [dossie_id, car_number, owner_cpf_hash, correlation_id, tenant_id]
+      properties:
+        dossie_id: { type: string }
+        car_number: { type: string }
+        owner_cpf_hash:
+          type: string
+          minLength: 64
+          maxLength: 64
+        correlation_id: { type: string, format: uuid }
+        tenant_id: { type: string }
+
+    JobAccepted:
+      type: object
+      required: [job_id, status]
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [pending, running] }
+        submitted_at: { type: string, format: date-time }
+
+    SecurityJobStatus:
+      type: object
+      required: [job_id, dossie_id, status]
+      properties:
+        job_id: { type: string }
+        dossie_id: { type: string }
+        status: { type: string, enum: [pending, running, completed, failed] }
+        liveness_passed:
+          type: boolean
+          nullable: true
+        deepfake_probability:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        voice_clone_probability:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        digital_mask_probability:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        title_verified_on_blockchain:
+          type: boolean
+          nullable: true
+        blockchain_tx_hash:
+          type: string
+          nullable: true
+        fraud_risk_level:
+          type: string
+          enum: [low, medium, high, critical]
+          nullable: true
+        kyc_passed:
+          type: boolean
+          nullable: true
+
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+  responses:
+    BadRequest:
+      description: Requisição malformada
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Unauthorized:
+      description: Token ausente ou inválido
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    Forbidden:
+      description: Scope insuficiente
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    NotFound:
+      description: Job não encontrado
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    UnprocessableEntity:
+      description: Validação falhou
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }
+    ServiceUnavailable:
+      description: Blockchain indisponível
+      content:
+        application/json: { schema: { $ref: "#/components/schemas/Error" } }

@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agrotrust-config
+  namespace: agrotrust
+  labels:
+    app.kubernetes.io/part-of: agrotrust-ai
+data:
+  # ─── Ambiente ──────────────────────────────────────────────────────────────
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+
+  # ─── Kafka ─────────────────────────────────────────────────────────────────
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.agrotrust.svc.cluster.local:9092"
+  KAFKA_SCHEMA_REGISTRY_URL: "http://schema-registry.agrotrust.svc.cluster.local:8081"
+  KAFKA_CONSUMER_GROUP_ID: "agrotrust-core"
+  KAFKA_AUTO_OFFSET_RESET: "earliest"
+  KAFKA_ENABLE_AUTO_COMMIT: "false"
+  KAFKA_SECURITY_PROTOCOL: "SASL_SSL"
+  KAFKA_SASL_MECHANISM: "PLAIN"
+
+  # ─── Tópicos (informativo – fonte de verdade é core/events/topics.py) ─────
+  KAFKA_TOPIC_SUBSCRIPTION_INITIATED: "agrotrust.subscription.initiated"
+  KAFKA_TOPIC_AGENT_ESG_RESULT: "agrotrust.agent.esg.result"
+  KAFKA_TOPIC_AGENT_FINANCIAL_RESULT: "agrotrust.agent.financial.result"
+  KAFKA_TOPIC_AGENT_SECURITY_RESULT: "agrotrust.agent.security.result"
+  KAFKA_TOPIC_SUBSCRIPTION_VERDICT: "agrotrust.subscription.verdict"
+  KAFKA_TOPIC_AUDIT_LOG: "agrotrust.audit.log"
+
+  # ─── APIs governamentais (URLs reais em prod) ──────────────────────────────
+  GOV_SICAR_BASE_URL: "https://api.sicar.gov.br"
+  GOV_GEE_BASE_URL: "https://earthengine.googleapis.com"
+  GOV_DATAPREV_BASE_URL: "https://api.dataprev.gov.br"
+  GOV_OPEN_FINANCE_BASE_URL: "https://api.openfinance.org.br"
+  GOV_REQUEST_TIMEOUT: "30"
+  GOV_MAX_RETRIES: "3"
+
+  # ─── Banco de dados ────────────────────────────────────────────────────────
+  DB_POOL_SIZE: "10"
+  DB_MAX_OVERFLOW: "20"
+  DB_POOL_TIMEOUT: "30"
+
+  # ─── Segurança ─────────────────────────────────────────────────────────────
+  SEC_JWT_ALGORITHM: "RS256"
+  SEC_JWT_EXPIRE_MINUTES: "30"
+  SEC_MTLS_ENABLED: "true"
+  SEC_TLS_CERT_PATH: "/run/secrets/tls.crt"
+  SEC_TLS_KEY_PATH: "/run/secrets/tls.key"

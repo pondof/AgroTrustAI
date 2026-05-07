@@ -1,0 +1,81 @@
+version: "3.9"
+
+# AgroTrust AI – Mocks de APIs Governamentais
+# Sobe todos os 4 mocks em containers isolados para dev e testes de integração
+
+name: agrotrust-mocks
+
+networks:
+  agrotrust-net:
+    external: true
+    name: agrotrust-infra_agrotrust-net
+
+services:
+
+  mock-sicar:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mock
+      args:
+        MOCK_MODULE: mocks.sicar.app
+        MOCK_PORT: "8001"
+    container_name: agrotrust-mock-sicar
+    networks: [agrotrust-net]
+    ports:
+      - "8001:8001"
+    environment:
+      MOCK_NAME: "SICAR CAR API"
+    labels:
+      agrotrust.mock: "true"
+      agrotrust.gov-api: "sicar"
+
+  mock-gee:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mock
+      args:
+        MOCK_MODULE: mocks.gee.app
+        MOCK_PORT: "8002"
+    container_name: agrotrust-mock-gee
+    networks: [agrotrust-net]
+    ports:
+      - "8002:8002"
+    environment:
+      MOCK_NAME: "Google Earth Engine API"
+    labels:
+      agrotrust.mock: "true"
+      agrotrust.gov-api: "gee"
+
+  mock-dataprev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mock
+      args:
+        MOCK_MODULE: mocks.dataprev.app
+        MOCK_PORT: "8003"
+    container_name: agrotrust-mock-dataprev
+    networks: [agrotrust-net]
+    ports:
+      - "8003:8003"
+    environment:
+      MOCK_NAME: "Dataprev DaaS API"
+    labels:
+      agrotrust.mock: "true"
+      agrotrust.gov-api: "dataprev"
+
+  mock-open-finance:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mock
+      args:
+        MOCK_MODULE: "mocks.open-finance.app"
+        MOCK_PORT: "8004"
+    container_name: agrotrust-mock-open-finance
+    networks: [agrotrust-net]
+    ports:
+      - "8004:8004"
+    environment:
+      MOCK_NAME: "Open Finance BR"
+    labels:
+      agrotrust.mock: "true"
+      agrotrust.gov-api: "open-finance"

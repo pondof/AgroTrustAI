@@ -1,0 +1,117 @@
+# =============================================================================
+# AgroTrust AI – Workflow de Segurança
+# Roda semanalmente (segunda 03:00 UTC) e em pushes para main.
+# Findings vão para a aba GitHub Security via SARIF.
+# =============================================================================
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1" # toda segunda-feira 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # ─── Trivy (imagens Docker) ──────────────────────────────────────────────
+  trivy-images:
+    name: Trivy – container scan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mock: [sicar, gee, dataprev, open-finance]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build mock image
+        run: |
+          docker build \
+            --build-arg MOCK_MODULE=mocks.${{ matrix.mock }}.app \
+            --build-arg MOCK_PORT=8000 \
+            -f docker/Dockerfile.mock \
+            -t agrotrust/mock-${{ matrix.mock }}:scan .
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: agrotrust/mock-${{ matrix.mock }}:scan
+          format: sarif
+          output: trivy-${{ matrix.mock }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.mock }}.sarif
+          category: trivy-${{ matrix.mock }}
+
+  # ─── Semgrep (SAST) ──────────────────────────────────────────────────────
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep
+        run: |
+          semgrep ci \
+            --config p/python \
+            --config p/secrets \
+            --config p/owasp-top-ten \
+            --sarif --output=semgrep.sarif || true
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  # ─── pip-audit (dependências Python) ─────────────────────────────────────
+  pip-audit:
+    name: pip-audit – Python deps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install --upgrade pip pip-audit
+      - run: pip-audit --strict --format=json --output=pip-audit.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-report
+          path: pip-audit.json
+
+  # ─── Checkov (IaC) ───────────────────────────────────────────────────────
+  checkov:
+    name: Checkov – IaC scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: dockerfile,kubernetes,docker_compose
+          output_format: sarif
+          output_file_path: checkov.sarif
+          soft_fail: true
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+          category: checkov

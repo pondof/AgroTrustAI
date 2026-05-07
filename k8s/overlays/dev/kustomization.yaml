@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Overlay de desenvolvimento: aponta APIs governamentais para os mocks locais.
+namespace: agrotrust
+
+resources:
+  - ../../base
+
+# Patch do ConfigMap: troca URLs reais por mocks locais
+patches:
+  - target:
+      kind: ConfigMap
+      name: agrotrust-config
+    patch: |-
+      - op: replace
+        path: /data/ENVIRONMENT
+        value: dev
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: DEBUG
+      - op: replace
+        path: /data/DEBUG
+        value: "true"
+      - op: replace
+        path: /data/KAFKA_SECURITY_PROTOCOL
+        value: PLAINTEXT
+      - op: replace
+        path: /data/SEC_MTLS_ENABLED
+        value: "false"
+      - op: replace
+        path: /data/SEC_JWT_ALGORITHM
+        value: HS256
+      - op: replace
+        path: /data/GOV_SICAR_BASE_URL
+        value: http://mock-sicar.agrotrust.svc.cluster.local:8001
+      - op: replace
+        path: /data/GOV_GEE_BASE_URL
+        value: http://mock-gee.agrotrust.svc.cluster.local:8002
+      - op: replace
+        path: /data/GOV_DATAPREV_BASE_URL
+        value: http://mock-dataprev.agrotrust.svc.cluster.local:8003
+      - op: replace
+        path: /data/GOV_OPEN_FINANCE_BASE_URL
+        value: http://mock-open-finance.agrotrust.svc.cluster.local:8004
+
+commonLabels:
+  environment: dev

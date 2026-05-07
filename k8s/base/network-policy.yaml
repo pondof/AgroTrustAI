@@ -1,0 +1,185 @@
+# =============================================================================
+# AgroTrust AI – NetworkPolicies Zero Trust
+# Princípio: deny-all por padrão, libera somente fluxos explícitos.
+#   Cliente externo → Gateway
+#   Gateway        → Orchestrator
+#   Orchestrator   → Agents (ESG, Financial, Security)
+#   Agents         → Mocks/APIs governamentais
+#   Todos          → Kafka, PostgreSQL, Redis (bus + storage)
+# Nenhum acesso direto externo aos agentes ou ao bus.
+# =============================================================================
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: agrotrust
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-ingress
+  namespace: agrotrust
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-egress
+  namespace: agrotrust
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway
+  policyTypes: [Egress]
+  egress:
+    # Para o Orchestrator
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: orchestrator
+      ports:
+        - protocol: TCP
+          port: 8020
+    # Kafka, PostgreSQL, Redis (bus + storage)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: kafka
+      ports: [{ protocol: TCP, port: 9092 }]
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: postgres
+      ports: [{ protocol: TCP, port: 5432 }]
+    # DNS dentro do cluster
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: orchestrator-policy
+  namespace: agrotrust
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: orchestrator
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: gateway
+  egress:
+    # Para os 3 agentes
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [agent-esg, agent-financial, agent-security]
+    # Kafka + PG
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [kafka, postgres]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-policy
+  namespace: agrotrust
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [agent-esg, agent-financial, agent-security]
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # Apenas o Orchestrator pode chamar agentes (sem ingress externo)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: orchestrator
+  egress:
+    # Acesso a APIs governamentais externas (CIDR público)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }
+    # Kafka + Redis + PG dentro do cluster
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [kafka, postgres, redis]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-plane-policy
+  namespace: agrotrust
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [kafka, postgres, redis]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values: [agrotrust-ai]
