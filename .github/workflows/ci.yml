@@ -42,7 +42,7 @@ jobs:
           pip install --prefer-binary \
             pytest pytest-asyncio pytest-cov faker \
             fastapi httpx pydantic pydantic-settings \
-            python-jose passlib cryptography structlog tenacity \
+            python-jose "passlib[bcrypt]" "bcrypt<4.0" cryptography structlog tenacity \
             pynacl numpy scikit-learn shap xgboost \
             shapely geopandas pyproj \
             langchain-core langgraph \
@@ -70,7 +70,7 @@ jobs:
           pip install --prefer-binary \
             pytest pytest-asyncio httpx fastapi uvicorn \
             pydantic pydantic-settings structlog \
-            python-jose passlib cryptography tenacity pynacl faker
+            python-jose "passlib[bcrypt]" "bcrypt<4.0" cryptography tenacity pynacl faker
       - name: Run contract tests
         # Override addopts (que inclui --cov=agents) para não exigir agents/ imports
         run: pytest tests/contract/ -v --tb=short --override-ini="addopts="

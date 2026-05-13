@@ -90,6 +90,8 @@ def compute_merkle_root(leaves: list[str]) -> str:
     """
     if not leaves:
         return sha3_256(b"empty")
+    if len(leaves) == 1:
+        return sha3_256(leaves[0].encode())
     nodes = list(leaves)
     while len(nodes) > 1:
         if len(nodes) % 2 != 0:
