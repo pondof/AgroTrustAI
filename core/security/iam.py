@@ -72,9 +72,7 @@ class ServiceIdentity:
     def require_scope(self, scope: Scope) -> None:
         """Lança PermissionError se o scope não estiver presente."""
         if not self.has_scope(scope):
-            raise PermissionError(
-                f"Acesso negado: scope '{scope.value}' necessário para subject='{self.subject}'"
-            )
+            raise PermissionError(f"Acesso negado: scope '{scope.value}' necessário para subject='{self.subject}'")
 
 
 # ─── Token JWT ────────────────────────────────────────────────────────────────
