@@ -167,6 +167,8 @@ class VerdictEngine:
             dossie_id=state.get("dossie_id"),
             fraud_risk=sec.fraud_risk_level,
         )
+        sec_score = _security_to_score(sec)
+        composite = _W_SEC * sec_score
         return SubscriptionVerdictEvent(
             correlation_id=state.get("correlation_id", ""),
             tenant_id=state.get("tenant_id", ""),
@@ -176,8 +178,22 @@ class VerdictEngine:
             rejection_reasons=[reason],
             esg_score=0.0,
             financial_score=0.0,
-            security_score=_security_to_score(sec),
-            composite_score=_W_SEC * _security_to_score(sec),
-            xai_consolidated_rationale={"security_rationale": sec.xai_rationale, "short_circuit": True},
+            security_score=sec_score,
+            composite_score=round(composite, 2),
+            # Mantém o contrato XAI consolidado mesmo em short-circuit: ESG/Fin
+            # ficam vazios (não rodaram) mas as 4 chaves do contrato existem.
+            xai_consolidated_rationale={
+                "scores": {
+                    "esg": 0.0,
+                    "financial": 0.0,
+                    "security": sec_score,
+                    "composite": round(composite, 2),
+                },
+                "esg_rationale": {},
+                "financial_rationale": {},
+                "security_rationale": sec.xai_rationale,
+                "short_circuit": True,
+                "short_circuit_reason": reason,
+            },
             processing_time_ms=processing_ms,
         )
