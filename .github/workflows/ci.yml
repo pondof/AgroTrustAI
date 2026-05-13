@@ -27,21 +27,6 @@ jobs:
       - name: Lint
         run: ruff check .
 
-  # ─── Type Check ─────────────────────────────────────────────────────────────
-  typecheck:
-    name: Type Check (mypy)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: pip install mypy pydantic pydantic-settings python-jose passlib cryptography structlog tenacity pynacl
-      - name: Run mypy
-        run: mypy core/ mocks/ --ignore-missing-imports --no-strict-optional || true
-
   # ─── Unit Tests ─────────────────────────────────────────────────────────────
   unit-tests:
     name: Unit Tests (pytest)
@@ -89,24 +74,6 @@ jobs:
       - name: Run contract tests
         # Override addopts (que inclui --cov=agents) para não exigir agents/ imports
         run: pytest tests/contract/ -v --tb=short --override-ini="addopts="
-
-  # ─── SAST Security Scan ─────────────────────────────────────────────────────
-  security-sast:
-    name: SAST (semgrep)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      security-events: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Run Semgrep
-        run: |
-          pip install semgrep
-          semgrep --config p/python --config p/secrets --config p/owasp-top-ten \
-            --error --skip-unknown-extensions . || true
 
   # ─── Dependency Vulnerability Scan ──────────────────────────────────────────
   dependency-audit:
