@@ -10,10 +10,11 @@ Endpoints:
 Auth: JWT Bearer (Zero Trust). Identidade injetada via JWTAuthMiddleware.
 Erros: AgentExecutionError → 500 com correlation_id; ValidationError → 422.
 """
+
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -90,7 +91,8 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error_handler(
-        request: Request, exc: RequestValidationError,
+        request: Request,
+        exc: RequestValidationError,
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

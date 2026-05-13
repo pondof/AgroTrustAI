@@ -4,6 +4,7 @@ AgroTrust AI – DossieState: estado compartilhado entre todos os nós do orques
 Contém os campos do SubscriptionInitiatedEvent + saídas dos 3 agentes + veredicto.
 TypedDict com total=False: todos os campos são opcionais para inicialização incremental.
 """
+
 from __future__ import annotations
 
 from typing import TypedDict
@@ -21,7 +22,7 @@ class DossieState(TypedDict, total=False):
     dossie_id: str
     correlation_id: str
     tenant_id: str
-    producer_cpf_hash: str     # SHA-3-256 – nunca CPF em claro
+    producer_cpf_hash: str  # SHA-3-256 – nunca CPF em claro
     car_number: str
     property_area_ha: float
     location_lat: float
@@ -32,10 +33,10 @@ class DossieState(TypedDict, total=False):
     requested_by: str
 
     # ─── Campos derivados / resolução de identidade (não vêm no evento Kafka) ─
-    holder_did: str            # DID Dataprev do produtor
+    holder_did: str  # DID Dataprev do produtor
     open_finance_consent_id: str
-    session_id: str            # ID da sessão biométrica
-    media_url: str             # URL do vídeo/foto (criptografada)
+    session_id: str  # ID da sessão biométrica
+    media_url: str  # URL do vídeo/foto (criptografada)
 
     # ─── Saídas dos agentes ──────────────────────────────────────────────────
     esg_output: ESGOutput | None
@@ -46,6 +47,6 @@ class DossieState(TypedDict, total=False):
     verdict: SubscriptionVerdictEvent | None
 
     # ─── Controle de execução ────────────────────────────────────────────────
-    start_time_unix: float     # epoch para calcular processing_time_ms
+    start_time_unix: float  # epoch para calcular processing_time_ms
     short_circuit_reason: str  # preenchido quando security SHORT-CIRCUIT
     error: str | None

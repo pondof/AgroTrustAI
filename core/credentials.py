@@ -19,6 +19,7 @@ criptográfica aqui valida:
 Em produção: substituir _verify_proof_value() por nacl.signing.VerifyKey.verify()
 com chave pública obtida via DID Resolution (did:web ou did:key).
 """
+
 from __future__ import annotations
 
 import base64
@@ -35,7 +36,7 @@ logger = structlog.get_logger(__name__)
 
 VC_CONTEXT_V1 = "https://www.w3.org/2018/credentials/v1"
 DID_GOV_BR_PREFIX = "did:gov:br:"
-MIN_PROOF_BYTES = 32              # didático – Ed25519 real são 64 bytes
+MIN_PROOF_BYTES = 32  # didático – Ed25519 real são 64 bytes
 ED25519_PROOF_TYPE = "Ed25519Signature2020"
 
 
@@ -45,10 +46,11 @@ ED25519_PROOF_TYPE = "Ed25519Signature2020"
 @dataclass(slots=True)
 class VCProof:
     """W3C VC Proof (assinatura criptográfica)."""
+
     type: str
-    created: str                # ISO-8601
-    verificationMethod: str     # DID URL apontando para a chave pública
-    proofValue: str             # base64url sem padding
+    created: str  # ISO-8601
+    verificationMethod: str  # DID URL apontando para a chave pública
+    proofValue: str  # base64url sem padding
 
     # Campo opcional para extensões (proofPurpose, domain, challenge…)
     extra: dict[str, Any] = field(default_factory=dict)
@@ -57,10 +59,11 @@ class VCProof:
 @dataclass(slots=True)
 class VerifiableCredential:
     """W3C VC v1.1."""
-    context: list[str]                       # @context – lista de URIs
+
+    context: list[str]  # @context – lista de URIs
     type: list[str]
-    issuer: str                              # DID do emissor
-    issuanceDate: str                        # ISO-8601
+    issuer: str  # DID do emissor
+    issuanceDate: str  # ISO-8601
     credentialSubject: dict[str, Any]
     proof: VCProof
     expirationDate: str | None = None
@@ -91,8 +94,8 @@ class VCVerificationResult:
     valid: bool
     checks_passed: list[str]
     checks_failed: list[str]
-    verified_at: str            # ISO-8601 UTC
-    chain_of_trust: list[str]   # ex: ["Dataprev", "Gov.br", "ITI"]
+    verified_at: str  # ISO-8601 UTC
+    chain_of_trust: list[str]  # ex: ["Dataprev", "Gov.br", "ITI"]
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -227,10 +230,7 @@ def build_vc_from_dataprev_payload(
     sintetizamos uma assinatura determinística a partir do credential_id.
     """
     issuer = payload.get("issuer") or "did:gov:br:dataprev"
-    issuance_date = (
-        payload.get("verification_timestamp")
-        or datetime.now(UTC).isoformat()
-    )
+    issuance_date = payload.get("verification_timestamp") or datetime.now(UTC).isoformat()
     credential_type = payload.get("credential_type", "AgriculturalProducerCredential")
 
     claims = payload.get("claims") or {}
@@ -238,8 +238,7 @@ def build_vc_from_dataprev_payload(
         "id": holder_did,
         "name_hash": claims.get("name_hash"),
         "cpf_hash": claims.get("cpf_hash"),
-        "rural_producer_registry_id": claims.get("rural_producer_registry_id")
-            or payload.get("credential_id"),
+        "rural_producer_registry_id": claims.get("rural_producer_registry_id") or payload.get("credential_id"),
     }
 
     # Sintetiza um proofValue determinístico de 64 bytes (placeholder de Ed25519).

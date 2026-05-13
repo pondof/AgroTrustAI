@@ -2,6 +2,7 @@
 AgroTrust AI – Configurações centralizadas com pydantic-settings.
 Todas as variáveis sensíveis são lidas de env vars ou secrets; nunca hardcoded.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -12,8 +13,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Environment(str, Enum):
-    DEV        = "dev"
-    STAGING    = "staging"
+    DEV = "dev"
+    STAGING = "staging"
     PRODUCTION = "production"
 
 
@@ -22,7 +23,7 @@ class KafkaSettings(BaseSettings):
 
     bootstrap_servers: str = "localhost:9092"
     schema_registry_url: str = "http://localhost:8081"
-    security_protocol: str = "PLAINTEXT"   # SASL_SSL em prod
+    security_protocol: str = "PLAINTEXT"  # SASL_SSL em prod
     sasl_mechanism: str = "PLAIN"
     sasl_username: SecretStr = Field(default=SecretStr(""))
     sasl_password: SecretStr = Field(default=SecretStr(""))
@@ -34,9 +35,7 @@ class KafkaSettings(BaseSettings):
 class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="DB_")
 
-    url: SecretStr = Field(
-        default=SecretStr("postgresql+asyncpg://agrotrust:agrotrust@localhost:5432/agrotrust")
-    )
+    url: SecretStr = Field(default=SecretStr("postgresql+asyncpg://agrotrust:agrotrust@localhost:5432/agrotrust"))
     pool_size: int = 10
     max_overflow: int = 20
     pool_timeout: int = 30
@@ -54,16 +53,17 @@ class SecuritySettings(BaseSettings):
         description="AES-256 master key (64 hex chars). Use HSM in production.",
     )
     tls_cert_path: str = "/run/secrets/tls.crt"
-    tls_key_path: str  = "/run/secrets/tls.key"
+    tls_key_path: str = "/run/secrets/tls.key"
     mtls_enabled: bool = False  # True em staging/prod
 
 
 class GovernmentAPISettings(BaseSettings):
     """URLs das APIs governamentais. Em dev apontam para os mocks."""
+
     model_config = SettingsConfigDict(env_prefix="GOV_")
 
     sicar_base_url: str = "http://localhost:8001"
-    gee_base_url: str   = "http://localhost:8002"
+    gee_base_url: str = "http://localhost:8002"
     dataprev_base_url: str = "http://localhost:8003"
     open_finance_base_url: str = "http://localhost:8004"
     # Timeouts em segundos (APIs gov podem ser lentas)

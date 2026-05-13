@@ -7,6 +7,7 @@ Fluxo:
 
 Fan-out paralelo: ESG + Financeiro rodam via asyncio.gather no nó parallel_agents.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -91,8 +92,7 @@ async def _node_security_check(state: DossieState) -> dict[str, Any]:
 
     if sec_output.fraud_risk_level == "critical":
         updates["short_circuit_reason"] = (
-            f"Fraude crítica: liveness={sec_output.liveness_passed} "
-            f"deepfake={sec_output.deepfake_probability:.2f}"
+            f"Fraude crítica: liveness={sec_output.liveness_passed} deepfake={sec_output.deepfake_probability:.2f}"
         )
     return updates
 

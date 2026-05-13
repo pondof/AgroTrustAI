@@ -6,6 +6,7 @@ Cenários:
   2. Short-circuit: fraude crítica na etapa security → verdict=rejected sem chamar ESG/Financeiro
   3. composite_score dentro dos pesos esperados (0.35*ESG + 0.45*FIN + 0.20*SEC)
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -114,6 +115,7 @@ _FIN_SOLID = FinancialOutput(
 def reset_orchestrator_graph():
     """Reseta o singleton do grafo para isolar cada teste."""
     import agents.orchestrator.graph as _mod
+
     original = _mod._ORCHESTRATOR_GRAPH
     _mod._ORCHESTRATOR_GRAPH = None
     yield
@@ -141,9 +143,9 @@ async def test_full_pipeline_approved():
     assert verdict.rejection_reasons == []
 
     # Verifica composite_score: 0.35*1000 + 0.45*780 + 0.20*950
-    expected_esg = 1000.0   # APPROVED
-    expected_fin = 780.0    # trust_score
-    expected_sec = 950.0    # low = 950
+    expected_esg = 1000.0  # APPROVED
+    expected_fin = 780.0  # trust_score
+    expected_sec = 950.0  # low = 950
     expected_composite = 0.35 * expected_esg + 0.45 * expected_fin + 0.20 * expected_sec
     assert verdict.composite_score == pytest.approx(expected_composite, abs=1.0)
     assert verdict.composite_score >= 600.0

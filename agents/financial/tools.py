@@ -13,6 +13,7 @@ Geração:       2026-05-11 — dataset regenerado a cada cold start (lazy singl
 
 SHAP é síncrono → executado em thread pool via asyncio.to_thread().
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -32,15 +33,15 @@ logger = structlog.get_logger(__name__)
 # ─── Constantes do modelo ─────────────────────────────────────────────────────
 
 FEATURE_NAMES: list[str] = [
-    "avg_revenue_norm",      # receita média normalizada (0-1)
-    "dti_inverted",          # 1 - DTI  (quanto menor o DTI, maior o score)
-    "history_months_norm",   # meses de histórico / 24
-    "default_rate_inverted", # 1 - taxa_inadimplência
+    "avg_revenue_norm",  # receita média normalizada (0-1)
+    "dti_inverted",  # 1 - DTI  (quanto menor o DTI, maior o score)
+    "history_months_norm",  # meses de histórico / 24
+    "default_rate_inverted",  # 1 - taxa_inadimplência
 ]
 
-_REVENUE_MAX: float = 500_000.0   # R$ 500k/mês como teto de normalização
+_REVENUE_MAX: float = 500_000.0  # R$ 500k/mês como teto de normalização
 _MONTHS_MAX: float = 24.0
-_APPROVAL_THRESHOLD: float = 600.0   # cutoff binário para AUC-ROC
+_APPROVAL_THRESHOLD: float = 600.0  # cutoff binário para AUC-ROC
 _TARGET_AUC: float = 0.82
 _DATASET_SIZE: int = 5000
 
@@ -49,7 +50,7 @@ RISK_TIERS: list[tuple[float, str]] = [
     (650.0, "B"),
     (500.0, "C"),
     (350.0, "D"),
-    (0.0,   "E"),
+    (0.0, "E"),
 ]
 
 # XGBoost hyperparameters (especificação Fase 1)
@@ -90,15 +91,10 @@ def _generate_synthetic_dataset(
     hist_norm = rng.uniform(0.0, 1.0, n).astype(np.float64)
     default_inv = 1.0 - rng.uniform(0.0, 0.5, n).astype(np.float64)
 
-    X: npt.NDArray[np.float64] = np.column_stack(
-        [avg_rev, dti_inv, hist_norm, default_inv]
-    ).astype(np.float64)
+    X: npt.NDArray[np.float64] = np.column_stack([avg_rev, dti_inv, hist_norm, default_inv]).astype(np.float64)
 
     base: npt.NDArray[np.float64] = (
-        0.30 * avg_rev * 1000.0
-        + 0.35 * dti_inv * 1000.0
-        + 0.20 * hist_norm * 1000.0
-        + 0.15 * default_inv * 1000.0
+        0.30 * avg_rev * 1000.0 + 0.35 * dti_inv * 1000.0 + 0.20 * hist_norm * 1000.0 + 0.15 * default_inv * 1000.0
     )
 
     # Não-linearidade 1: bônus multiplicativo para "produtor forte"
@@ -128,9 +124,7 @@ def _get_model() -> tuple[xgb.XGBRegressor, npt.NDArray[np.float64]]:
         return _MODEL, _BACKGROUND
 
     X, y = _generate_synthetic_dataset()
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     model = xgb.XGBRegressor(**_XGB_PARAMS)
     model.fit(X_train, y_train)
@@ -265,16 +259,12 @@ async def calculate_trust_score_plus(
     default_rate = min(data.defaulted_operations / 5.0, 1.0)
     default_inv = 1.0 - default_rate
 
-    x: npt.NDArray[np.float64] = np.array(
-        [[avg_rev_norm, dti_inv, hist_norm, default_inv]], dtype=np.float64
-    )
+    x: npt.NDArray[np.float64] = np.array([[avg_rev_norm, dti_inv, hist_norm, default_inv]], dtype=np.float64)
 
     raw_score: float = float(model.predict(x)[0])
     trust_score = max(0.0, min(1000.0, raw_score))
 
-    shap_values: dict[str, float] = await asyncio.to_thread(
-        _compute_shap_sync, model, background, x
-    )
+    shap_values: dict[str, float] = await asyncio.to_thread(_compute_shap_sync, model, background, x)
 
     logger.info(
         "trust_score_calculated",

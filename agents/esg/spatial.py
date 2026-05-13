@@ -10,6 +10,7 @@ Implementa operações topológicas sobre o GeoJSON de desmatamento retornado pe
 Operações GeoPandas são síncronas/CPU-bound → sempre chame
 analyze_deforestation_spatial via asyncio.to_thread() no caller.
 """
+
 from __future__ import annotations
 
 import math
@@ -40,6 +41,7 @@ _DEG_LAT_TO_M = 111_320.0
 
 class SpatialAnalysisResult(BaseModel):
     """Resultado da análise espacial enriquecendo o output do GEE."""
+
     area_ha_calculated: float = Field(ge=0.0)
     centroid_lat: float
     centroid_lon: float
@@ -47,7 +49,7 @@ class SpatialAnalysisResult(BaseModel):
     overlap_with_buffer_ha: float = Field(default=0.0, ge=0.0)
     spatial_confidence: float = Field(ge=0.0, le=1.0)
     crs_used: str = _CRS_BRAZIL_METRIC
-    source: str   # "geojson" | "centroid_fallback"
+    source: str  # "geojson" | "centroid_fallback"
 
 
 # ─── PropertyPolygon ──────────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ class PropertyPolygon:
     Sempre armazenada em WGS84 (EPSG:4326). Conversões métricas são feitas
     on-demand via GeoPandas em analyze_deforestation_spatial().
     """
+
     geometry: Polygon | MultiPolygon
     source: str  # "geojson" | "centroid_fallback"
 
@@ -70,7 +73,7 @@ class PropertyPolygon:
         lat: float,
         lon: float,
         area_ha: float,
-    ) -> "PropertyPolygon":
+    ) -> PropertyPolygon:
         """
         Gera um quadrado aproximado centrado em (lat, lon) com a área desejada (ha).
 
@@ -85,20 +88,22 @@ class PropertyPolygon:
 
         # Conversão latitude (constante) e longitude (depende da latitude)
         dlat = half_side_m / _DEG_LAT_TO_M
-        cos_lat = max(math.cos(math.radians(lat)), 0.01)   # evita /0 nos polos
+        cos_lat = max(math.cos(math.radians(lat)), 0.01)  # evita /0 nos polos
         dlon = half_side_m / (_DEG_LAT_TO_M * cos_lat)
 
-        poly = Polygon([
-            (lon - dlon, lat - dlat),
-            (lon + dlon, lat - dlat),
-            (lon + dlon, lat + dlat),
-            (lon - dlon, lat + dlat),
-            (lon - dlon, lat - dlat),
-        ])
+        poly = Polygon(
+            [
+                (lon - dlon, lat - dlat),
+                (lon + dlon, lat - dlat),
+                (lon + dlon, lat + dlat),
+                (lon - dlon, lat + dlat),
+                (lon - dlon, lat - dlat),
+            ]
+        )
         return cls(geometry=poly, source="centroid_fallback")
 
     @classmethod
-    def from_geojson(cls, geojson: dict[str, Any]) -> "PropertyPolygon":
+    def from_geojson(cls, geojson: dict[str, Any]) -> PropertyPolygon:
         """
         Carrega de um FeatureCollection ou Feature/Polygon GeoJSON.
         Se vier FeatureCollection, faz union dos polígonos em MultiPolygon.
@@ -112,9 +117,7 @@ class PropertyPolygon:
             geoms = [shape(f["geometry"]) for f in features if f.get("geometry")]
             if not geoms:
                 raise ValueError("FeatureCollection sem features válidas")
-            unified = geoms[0] if len(geoms) == 1 else MultiPolygon(
-                [g for g in geoms if isinstance(g, Polygon)]
-            )
+            unified = geoms[0] if len(geoms) == 1 else MultiPolygon([g for g in geoms if isinstance(g, Polygon)])
             return cls(geometry=unified, source="geojson")
 
         if gtype == "Feature":

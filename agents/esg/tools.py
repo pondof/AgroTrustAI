@@ -7,6 +7,7 @@ Todas têm retry automático com backoff exponencial (tenacity).
 detect_deforestation: além de consultar o mock GEE, parseia o GeoJSON retornado
 e enriquece o resultado com análise espacial real (Shapely + GeoPandas + pyproj).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,8 +31,8 @@ logger = structlog.get_logger(__name__)
 
 class CARStatusResult(BaseModel):
     car_number: str
-    status: str                  # ativo | pendente | cancelado | suspenso
-    compliance_status: str       # regular | com_pendencia | irregular
+    status: str  # ativo | pendente | cancelado | suspenso
+    compliance_status: str  # regular | com_pendencia | irregular
     area_desmatamento_ha: float = Field(default=0.0, ge=0.0)
     area_total_ha: float
 
@@ -169,9 +170,7 @@ async def detect_deforestation(
         )
 
     features = (data.get("polygons") or {}).get("features") or []
-    images_count = sum(
-        1 for f in features if f.get("properties", {}).get("area_ha", 0) > 0
-    )
+    images_count = sum(1 for f in features if f.get("properties", {}).get("area_ha", 0) > 0)
 
     # Análise espacial (CPU-bound → thread pool)
     polygon = _build_property_polygon(
@@ -181,9 +180,7 @@ async def detect_deforestation(
         fallback_area_ha=max(area_ha, 1.0),
     )
     try:
-        spatial_result = await asyncio.to_thread(
-            analyze_deforestation_spatial, polygon, 2008
-        )
+        spatial_result = await asyncio.to_thread(analyze_deforestation_spatial, polygon, 2008)
     except Exception as exc:
         # Tolerância a falhas espaciais: log + segue sem enriquecer
         logger.warning("spatial_analysis_failed", error=str(exc), car_number=car_number)

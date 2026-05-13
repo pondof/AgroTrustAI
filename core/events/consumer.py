@@ -8,6 +8,7 @@ Garantias:
   - Graceful shutdown com signal handlers SIGTERM/SIGINT.
   - structlog com correlation_id em todo log do ciclo de vida.
 """
+
 from __future__ import annotations
 
 import abc

@@ -7,6 +7,7 @@ Agente ESG antes da integração com a API governamental real.
 
 Endpoint oficial (referência): https://www.car.gov.br/publico/municipios/downloads
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,21 +30,22 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 # ─── Modelos de resposta ──────────────────────────────────────────────────────
 
+
 class CARStatus(BaseModel):
     car_number: str
-    status: str                   # "ativo" | "pendente" | "cancelado" | "suspenso"
-    owner_cpf_hash: str           # SHA-3-256 do CPF real
+    status: str  # "ativo" | "pendente" | "cancelado" | "suspenso"
+    owner_cpf_hash: str  # SHA-3-256 do CPF real
     municipio: str
     estado: str
     area_total_ha: float
-    area_app_ha: float            # Área de Preservação Permanente
+    area_app_ha: float  # Área de Preservação Permanente
     area_reserva_legal_ha: float
-    area_desmatamento_ha: float   # Área com desmatamento detectado pós-2008
+    area_desmatamento_ha: float  # Área com desmatamento detectado pós-2008
     registration_date: str
     last_updated: str
     car_certificate_url: str | None
     pending_documents: list[str]
-    compliance_status: str        # "regular" | "com_pendencia" | "irregular"
+    compliance_status: str  # "regular" | "com_pendencia" | "irregular"
 
 
 class CARVerificationResult(BaseModel):
@@ -53,7 +55,7 @@ class CARVerificationResult(BaseModel):
     gee_images_count: int
     deforestation_detected: bool
     deforestation_area_ha: float
-    reference_baseline: str = "2008-07-22"   # Marco legal Código Florestal
+    reference_baseline: str = "2008-07-22"  # Marco legal Código Florestal
     confidence_score: float
     satellite_source: str = "Landsat-9 + Sentinel-2 (Google Earth Engine)"
     details: dict[str, Any]
@@ -63,33 +65,58 @@ class CARVerificationResult(BaseModel):
 
 _CAR_DATABASE: dict[str, dict[str, Any]] = {
     "MT-5100250-3A4B5C6D7E8F9A0B": {
-        "status": "ativo", "municipio": "Sorriso", "estado": "MT",
-        "area_total_ha": 2450.5, "area_app_ha": 245.0, "area_reserva_legal_ha": 735.15,
-        "area_desmatamento_ha": 0.0, "compliance_status": "regular",
+        "status": "ativo",
+        "municipio": "Sorriso",
+        "estado": "MT",
+        "area_total_ha": 2450.5,
+        "area_app_ha": 245.0,
+        "area_reserva_legal_ha": 735.15,
+        "area_desmatamento_ha": 0.0,
+        "compliance_status": "regular",
         "pending_documents": [],
     },
     "RS-4300158-1F2E3D4C5B6A7890": {
-        "status": "ativo", "municipio": "Cruz Alta", "estado": "RS",
-        "area_total_ha": 380.0, "area_app_ha": 38.0, "area_reserva_legal_ha": 76.0,
-        "area_desmatamento_ha": 0.0, "compliance_status": "regular",
+        "status": "ativo",
+        "municipio": "Cruz Alta",
+        "estado": "RS",
+        "area_total_ha": 380.0,
+        "area_app_ha": 38.0,
+        "area_reserva_legal_ha": 76.0,
+        "area_desmatamento_ha": 0.0,
+        "compliance_status": "regular",
         "pending_documents": [],
     },
     "PA-1500602-DEFOREST00000001": {
-        "status": "ativo", "municipio": "Altamira", "estado": "PA",
-        "area_total_ha": 1200.0, "area_app_ha": 480.0, "area_reserva_legal_ha": 960.0,
-        "area_desmatamento_ha": 87.3, "compliance_status": "irregular",
+        "status": "ativo",
+        "municipio": "Altamira",
+        "estado": "PA",
+        "area_total_ha": 1200.0,
+        "area_app_ha": 480.0,
+        "area_reserva_legal_ha": 960.0,
+        "area_desmatamento_ha": 87.3,
+        "compliance_status": "irregular",
         "pending_documents": ["PRAD", "TAC"],
     },
     "GO-5201405-PENDENTE00000001": {
-        "status": "pendente", "municipio": "Rio Verde", "estado": "GO",
-        "area_total_ha": 850.0, "area_app_ha": 85.0, "area_reserva_legal_ha": 170.0,
-        "area_desmatamento_ha": 0.0, "compliance_status": "com_pendencia",
+        "status": "pendente",
+        "municipio": "Rio Verde",
+        "estado": "GO",
+        "area_total_ha": 850.0,
+        "area_app_ha": 85.0,
+        "area_reserva_legal_ha": 170.0,
+        "area_desmatamento_ha": 0.0,
+        "compliance_status": "com_pendencia",
         "pending_documents": ["Retificação de área", "Análise técnica SEMA"],
     },
     "MS-5000203-CANCELADO0000001": {
-        "status": "cancelado", "municipio": "Dourados", "estado": "MS",
-        "area_total_ha": 420.0, "area_app_ha": 42.0, "area_reserva_legal_ha": 84.0,
-        "area_desmatamento_ha": 0.0, "compliance_status": "irregular",
+        "status": "cancelado",
+        "municipio": "Dourados",
+        "estado": "MS",
+        "area_total_ha": 420.0,
+        "area_app_ha": 42.0,
+        "area_reserva_legal_ha": 84.0,
+        "area_desmatamento_ha": 0.0,
+        "compliance_status": "irregular",
         "pending_documents": ["Novo cadastro obrigatório"],
     },
 }
@@ -113,8 +140,7 @@ def _make_car_response(car_number: str, data: dict[str, Any]) -> CARStatus:
         registration_date=(date.today() - timedelta(days=random.randint(365, 2000))).isoformat(),
         last_updated=(date.today() - timedelta(days=random.randint(1, 90))).isoformat(),
         car_certificate_url=(
-            f"https://www.car.gov.br/publico/imoveis/index/{car_number}"
-            if data["status"] == "ativo" else None
+            f"https://www.car.gov.br/publico/imoveis/index/{car_number}" if data["status"] == "ativo" else None
         ),
         pending_documents=data["pending_documents"],
         compliance_status=data["compliance_status"],
@@ -122,6 +148,7 @@ def _make_car_response(car_number: str, data: dict[str, Any]) -> CARStatus:
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:
@@ -160,7 +187,7 @@ async def verify_car_with_gee(
     Verificação aprofundada com cruzamento de imagens satelitais (simulação GEE).
     Em produção: orquestra chamadas ao Google Earth Engine.
     """
-    await asyncio.sleep(random.uniform(1.5, 4.0))   # GEE é mais lento
+    await asyncio.sleep(random.uniform(1.5, 4.0))  # GEE é mais lento
 
     if car_number not in _CAR_DATABASE:
         raise HTTPException(status_code=404, detail=f"CAR '{car_number}' não encontrado")
@@ -194,12 +221,13 @@ async def search_car_by_municipio(
     """Busca números CAR por município."""
     await asyncio.sleep(random.uniform(0.3, 1.0))
     return [
-        car for car, data in _CAR_DATABASE.items()
-        if data["municipio"].lower() == municipio.lower()
-        and data["estado"].upper() == estado.upper()
+        car
+        for car, data in _CAR_DATABASE.items()
+        if data["municipio"].lower() == municipio.lower() and data["estado"].upper() == estado.upper()
     ]
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")

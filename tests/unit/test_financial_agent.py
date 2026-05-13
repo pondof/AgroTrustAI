@@ -6,6 +6,7 @@ Cenários:
   2. Dados ruins (baixa receita, DTI alto, inadimplências) → trust_score baixo + tier D/E
   3. xai_rationale contém chave 'shap' com SHAP values por feature
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -27,7 +28,7 @@ _COMMON_INPUT = FinancialInput(
 _OPEN_FINANCE_GOOD = OpenFinanceData(
     consent_id="CONSENT_REGULAR_001",
     months_of_history=24,
-    avg_monthly_revenue_brl=300_000.0,   # R$300k/mês → avg_rev_norm=0.6
+    avg_monthly_revenue_brl=300_000.0,  # R$300k/mês → avg_rev_norm=0.6
     debt_to_income_ratio=0.10,
     defaulted_operations=0,
     total_rural_credit_brl=30_000.0,

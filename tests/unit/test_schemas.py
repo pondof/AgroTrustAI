@@ -8,6 +8,7 @@ Cobre:
   - TOPIC_SCHEMAS mapeando cada tópico para o schema correto.
   - Roundtrip de serialização/deserialização para cada tipo de evento.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,6 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from core.events.schemas import (
+    TOPIC_SCHEMAS,
     BaseEvent,
     ESGAgentResultEvent,
     ESGComplianceStatus,
@@ -24,9 +26,7 @@ from core.events.schemas import (
     SecurityAgentResultEvent,
     SubscriptionInitiatedEvent,
     SubscriptionVerdictEvent,
-    TOPIC_SCHEMAS,
 )
-
 
 # ─── Helpers de fábrica ──────────────────────────────────────────────────────
 
@@ -42,9 +42,7 @@ def _make_subscription_initiated(**overrides: object) -> SubscriptionInitiatedEv
         producer_cpf_hash="a" * 64,
         car_number="MT-5100250-3A4B5C6D7E8F9A0B",
         property_area_ha=2450.5,
-        location=PropertyLocation(
-            latitude=-12.5450, longitude=-55.7117, municipio="Sorriso", estado="MT"
-        ),
+        location=PropertyLocation(latitude=-12.5450, longitude=-55.7117, municipio="Sorriso", estado="MT"),
         credit_amount_brl=500_000.0,
         credit_purpose="custeio",
         requested_by="user-001",
@@ -186,9 +184,7 @@ class TestRequiredInheritedFields:
                 producer_cpf_hash="a" * 64,
                 car_number="MT-X",
                 property_area_ha=10.0,
-                location=PropertyLocation(
-                    latitude=0, longitude=0, municipio="X", estado="MT"
-                ),
+                location=PropertyLocation(latitude=0, longitude=0, municipio="X", estado="MT"),
                 credit_amount_brl=1000.0,
                 credit_purpose="custeio",
                 requested_by="u",
@@ -220,11 +216,11 @@ class TestRequiredInheritedFields:
 class TestTopicSchemasMapping:
     def test_all_expected_topics_present(self) -> None:
         expected = {
-            "agrotrust.subscription.initiated":  SubscriptionInitiatedEvent,
-            "agrotrust.agent.esg.result":        ESGAgentResultEvent,
-            "agrotrust.agent.financial.result":  FinancialAgentResultEvent,
-            "agrotrust.agent.security.result":   SecurityAgentResultEvent,
-            "agrotrust.subscription.verdict":    SubscriptionVerdictEvent,
+            "agrotrust.subscription.initiated": SubscriptionInitiatedEvent,
+            "agrotrust.agent.esg.result": ESGAgentResultEvent,
+            "agrotrust.agent.financial.result": FinancialAgentResultEvent,
+            "agrotrust.agent.security.result": SecurityAgentResultEvent,
+            "agrotrust.subscription.verdict": SubscriptionVerdictEvent,
         }
         for topic, schema in expected.items():
             assert topic in TOPIC_SCHEMAS

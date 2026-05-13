@@ -1,4 +1,5 @@
 """Testes unitários – core/security/crypto.py"""
+
 from __future__ import annotations
 
 import pytest
@@ -10,8 +11,7 @@ from core.security.crypto import (
     sha3_256,
 )
 
-
-VALID_KEY = "a" * 64   # 32 bytes hex válido para AES-256
+VALID_KEY = "a" * 64  # 32 bytes hex válido para AES-256
 
 
 class TestKeyManager:
@@ -36,6 +36,7 @@ class TestKeyManager:
         aad = b"contexto-correto"
         payload = self.km.encrypt(plaintext, associated_data=aad)
         from cryptography.exceptions import InvalidTag
+
         with pytest.raises((InvalidTag, Exception)):
             self.km.decrypt(payload, associated_data=b"contexto-errado")
 
@@ -59,6 +60,7 @@ class TestKeyManager:
         payload = self.km.encrypt(b"dados")
         d = payload.to_dict()
         from core.security.crypto import EncryptedPayload
+
         restored = EncryptedPayload.from_dict(d)
         assert self.km.decrypt(restored) == b"dados"
 
@@ -68,7 +70,7 @@ class TestHashing:
         h1 = sha3_256(b"agrotrust")
         h2 = sha3_256(b"agrotrust")
         assert h1 == h2
-        assert len(h1) == 64   # 32 bytes hex
+        assert len(h1) == 64  # 32 bytes hex
 
     def test_sha3_256_different_inputs(self) -> None:
         assert sha3_256(b"a") != sha3_256(b"b")
@@ -97,7 +99,7 @@ class TestHashing:
 class TestSecureToken:
     def test_token_length(self) -> None:
         token = generate_secure_token(32)
-        assert len(token) == 64   # 32 bytes => 64 hex chars
+        assert len(token) == 64  # 32 bytes => 64 hex chars
 
     def test_tokens_are_unique(self) -> None:
         tokens = {generate_secure_token() for _ in range(100)}

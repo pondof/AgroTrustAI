@@ -8,6 +8,7 @@ approved:       composite >= 600 AND ESG approved AND fraud_risk not critical/hi
 manual_review:  composite >= 450 OU qualquer agente retornou warning/pending_docs
 rejected:       demais casos (com rejection_reasons obrigatório – LGPD Art. 20)
 """
+
 from __future__ import annotations
 
 import time
@@ -34,20 +35,20 @@ _MANUAL_THRESHOLD = 450.0
 
 def _esg_to_score(esg: ESGOutput) -> float:
     mapping = {
-        ESGComplianceStatus.APPROVED:     1000.0,
-        ESGComplianceStatus.WARNING:       600.0,
-        ESGComplianceStatus.PENDING_DOCS:  500.0,
-        ESGComplianceStatus.REJECTED:        0.0,
+        ESGComplianceStatus.APPROVED: 1000.0,
+        ESGComplianceStatus.WARNING: 600.0,
+        ESGComplianceStatus.PENDING_DOCS: 500.0,
+        ESGComplianceStatus.REJECTED: 0.0,
     }
     return mapping.get(esg.compliance_status, 0.0)
 
 
 def _security_to_score(sec: SecurityOutput) -> float:
     mapping = {
-        "low":      950.0,
-        "medium":   700.0,
-        "high":     300.0,
-        "critical":   0.0,
+        "low": 950.0,
+        "medium": 700.0,
+        "high": 300.0,
+        "critical": 0.0,
     }
     return mapping.get(sec.fraud_risk_level, 0.0)
 
@@ -101,7 +102,9 @@ class VerdictEngine:
         has_warning = (
             (esg and esg.compliance_status in {ESGComplianceStatus.WARNING, ESGComplianceStatus.PENDING_DOCS})
             or (sec and sec.fraud_risk_level == "medium")
-            or not esg or not fin or not sec
+            or not esg
+            or not fin
+            or not sec
         )
 
         if composite >= _APPROVE_THRESHOLD and esg_approved and fraud_ok:

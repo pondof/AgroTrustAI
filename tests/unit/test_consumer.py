@@ -9,12 +9,13 @@ Cenários:
   2. handle() com orquestrador falhando → exceção propagada + audit.append com
      outcome="failure" registrado.
 """
+
 from __future__ import annotations
 
 import importlib.util
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

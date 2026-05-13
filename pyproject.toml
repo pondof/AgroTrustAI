@@ -52,9 +52,23 @@ dev = [
 
 [tool.ruff]
 target-version = "py311"
-line-length = 100
+line-length = 120
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "S", "B", "A", "C4", "T20"]
-ignore = ["S101", "S105", "S106"]
+ignore = [
+    "S101",   # assert in tests
+    "S105",   # hardcoded passwords (config/test values)
+    "S106",   # hardcoded passwords
+    "S311",   # random in mocks (não é uso criptográfico)
+    "S104",   # binding 0.0.0.0 é intencional em serviços/Docker
+    "N806",   # X, X_train etc são convenção padrão em ML
+    "N815",   # camelCase em W3C VC Data Model (padrão do spec)
+    "N999",   # diretórios de serviço com hífen (agent-esg etc) não são pacotes Python
+    "UP042",  # str+Enum é padrão compatível com Pydantic v2
+    "T201",   # print() em CLI tools (core/events/topics.py)
+    "B008",   # Depends() como default é padrão oficial do FastAPI
+]
 
 [tool.mypy]
 python_version = "3.11"

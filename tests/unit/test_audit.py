@@ -1,4 +1,5 @@
 """Testes unitários – core/security/audit.py (hash chain imutável)"""
+
 from __future__ import annotations
 
 import pytest

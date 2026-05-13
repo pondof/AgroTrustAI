@@ -8,6 +8,7 @@ Fluxo:
   4. SubscriptionVerdictEvent publicado em agrotrust.subscription.verdict
   5. Auditoria imutável registrada em cada etapa (LGPD Art. 37)
 """
+
 from __future__ import annotations
 
 import traceback
@@ -111,9 +112,7 @@ class SubscriptionConsumer(BaseConsumer):
 
         verdict: SubscriptionVerdictEvent | None = final_state.get("verdict")
         if verdict is None:
-            raise RuntimeError(
-                f"Orquestrador não produziu veredicto para dossie_id={dossie_id}"
-            )
+            raise RuntimeError(f"Orquestrador não produziu veredicto para dossie_id={dossie_id}")
 
         await self._producer.publish(
             topic=TOPIC_VERDICT,

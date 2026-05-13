@@ -6,12 +6,13 @@ Componentes:
   - JWTAuthMiddleware: valida Bearer token e injeta ServiceIdentity em request.state.
   - RateLimitMiddleware: rate limit in-memory por tenant (token bucket simplificado).
 """
+
 from __future__ import annotations
 
 import time
 import uuid
 from collections import defaultdict, deque
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware

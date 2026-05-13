@@ -10,13 +10,14 @@ Referências:
   - Gov.br: Carteira de Identidade Nacional (CIN)
   - W3C VC Data Model v2.0
 """
+
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import random
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException
@@ -31,8 +32,10 @@ app = FastAPI(
 
 # ─── Modelos ──────────────────────────────────────────────────────────────────
 
+
 class VerifiableCredential(BaseModel):
     """W3C VC Data Model v2.0 simplificado."""
+
     context: list[str]
     id: str
     type: list[str]
@@ -45,7 +48,7 @@ class VerifiableCredential(BaseModel):
 
 class CredentialVerificationResult(BaseModel):
     credential_id: str
-    holder_did: str              # Decentralized Identifier do produtor
+    holder_did: str  # Decentralized Identifier do produtor
     verified: bool
     verification_method: str
     verification_timestamp: str
@@ -53,22 +56,23 @@ class CredentialVerificationResult(BaseModel):
     issuer: str
     is_revoked: bool
     revocation_reason: str | None
-    claims: dict[str, Any]       # Claims verificados (sem PII em claro)
+    claims: dict[str, Any]  # Claims verificados (sem PII em claro)
     signature_valid: bool
-    chain_of_trust: list[str]    # Cadeia de confiança até raiz gov.br
+    chain_of_trust: list[str]  # Cadeia de confiança até raiz gov.br
 
 
 class ProducerDAASProfile(BaseModel):
     holder_did: str
-    cin_verified: bool           # Carteira de Identidade Nacional
-    car_linked: bool             # CAR vinculado na identidade digital
+    cin_verified: bool  # Carteira de Identidade Nacional
+    car_linked: bool  # CAR vinculado na identidade digital
     rural_producer_credential: VerifiableCredential | None
     biometric_enrolled: bool
     last_verification: str
-    trust_level: str             # "high" | "medium" | "low" | "unverified"
+    trust_level: str  # "high" | "medium" | "low" | "unverified"
 
 
 # ─── Base de dados simulada ───────────────────────────────────────────────────
+
 
 def _did(seed: str) -> str:
     h = hashlib.sha3_256(seed.encode()).hexdigest()[:32]
@@ -95,7 +99,7 @@ _PRODUCER_DATABASE: dict[str, dict[str, Any]] = {
     "DID_PENDING_PRODUCER_002": {
         "holder_did": _did("producer-002"),
         "cin_verified": True,
-        "car_linked": False,   # CAR não vinculado ainda
+        "car_linked": False,  # CAR não vinculado ainda
         "car_number": None,
         "biometric_enrolled": True,
         "trust_level": "medium",
@@ -150,6 +154,7 @@ def _build_vc(holder_did: str, data: dict[str, Any]) -> VerifiableCredential:
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "mock-dataprev-daas"}
@@ -171,9 +176,7 @@ async def verify_credential(
     if random.random() < 0.03:
         raise HTTPException(status_code=503, detail="Dataprev DaaS temporariamente indisponível")
 
-    producer = next(
-        (v for v in _PRODUCER_DATABASE.values() if v["holder_did"] == holder_did), None
-    )
+    producer = next((v for v in _PRODUCER_DATABASE.values() if v["holder_did"] == holder_did), None)
     if not producer:
         raise HTTPException(status_code=404, detail=f"DID '{holder_did}' não encontrado no DaaS")
 
@@ -201,9 +204,7 @@ async def get_producer_profile(
     """Retorna perfil DaaS completo do produtor incluindo credencial rural."""
     await asyncio.sleep(random.uniform(0.3, 1.2))
 
-    producer = next(
-        (v for v in _PRODUCER_DATABASE.values() if v["holder_did"] == holder_did), None
-    )
+    producer = next((v for v in _PRODUCER_DATABASE.values() if v["holder_did"] == holder_did), None)
     if not producer:
         raise HTTPException(status_code=404, detail=f"DID '{holder_did}' não encontrado")
 
@@ -228,12 +229,11 @@ async def issue_credential(
 ) -> VerifiableCredential:
     """Emite nova credencial verificável (usado no onboarding)."""
     await asyncio.sleep(random.uniform(0.5, 2.0))
-    data: dict[str, Any] = {
-        "claims": {"rural_producer": True, "new_enrollment": True}
-    }
+    data: dict[str, Any] = {"claims": {"rural_producer": True, "new_enrollment": True}}
     return _build_vc(holder_did, data)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8003, log_level="info")

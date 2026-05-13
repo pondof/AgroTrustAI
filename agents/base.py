@@ -7,6 +7,7 @@ Contratos:
   - Todo I/O de log usa structlog com correlation_id em contexto
   - Erros de execução são sempre AgentExecutionError (nunca raw exception)
 """
+
 from __future__ import annotations
 
 import abc
@@ -33,10 +34,7 @@ class AgentExecutionError(Exception):
         self.correlation_id = correlation_id
         self.agent_name = agent_name
         self.original_exception = original_exception
-        super().__init__(
-            f"[{agent_name}:{correlation_id}] "
-            f"{type(original_exception).__name__}: {original_exception}"
-        )
+        super().__init__(f"[{agent_name}:{correlation_id}] {type(original_exception).__name__}: {original_exception}")
 
 
 # ─── XAI factor helper ────────────────────────────────────────────────────────
@@ -46,9 +44,9 @@ class XAIFactor(BaseModel):
     """Um único fator de explicabilidade da decisão."""
 
     name: str
-    weight: float          # importância relativa (0-1), normalizada entre os fatores
-    value: object          # valor real do fator no dossiê
-    impact: str            # "positive" | "negative" | "neutral"
+    weight: float  # importância relativa (0-1), normalizada entre os fatores
+    value: object  # valor real do fator no dossiê
+    impact: str  # "positive" | "negative" | "neutral"
 
 
 # ─── Base abstrata ────────────────────────────────────────────────────────────

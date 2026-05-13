@@ -8,6 +8,7 @@ Regras:
   - SHA-3-256 para hashing determinístico (logs de auditoria, Merkle roots).
   - Zero dados sensíveis em logs.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -18,24 +19,26 @@ from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-
 # ─── Tipos ────────────────────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True, slots=True)
 class EncryptedPayload:
     """Resultado de encrypt(). Serializa como Base64 para transporte."""
-    ciphertext_b64: str   # nonce || ciphertext || tag (concatenados, depois b64)
-    key_version: str      # referência à versão da chave (para rotação)
+
+    ciphertext_b64: str  # nonce || ciphertext || tag (concatenados, depois b64)
+    key_version: str  # referência à versão da chave (para rotação)
 
     def to_dict(self) -> dict[str, str]:
         return {"c": self.ciphertext_b64, "kv": self.key_version}
 
     @classmethod
-    def from_dict(cls, d: dict[str, str]) -> "EncryptedPayload":
+    def from_dict(cls, d: dict[str, str]) -> EncryptedPayload:
         return cls(ciphertext_b64=d["c"], key_version=d["kv"])
 
 
 # ─── Gerenciamento de chaves ──────────────────────────────────────────────────
+
 
 class KeyManager:
     """
@@ -43,8 +46,8 @@ class KeyManager:
     Em produção, substituir por integração com HSM / KMS (ex: AWS KMS, Azure Key Vault).
     """
 
-    NONCE_SIZE = 12   # 96 bits – recomendado pelo NIST para AES-GCM
-    TAG_SIZE   = 16   # 128 bits
+    NONCE_SIZE = 12  # 96 bits – recomendado pelo NIST para AES-GCM
+    TAG_SIZE = 16  # 128 bits
 
     def __init__(self, master_key_hex: str, version: str = "v1") -> None:
         if len(master_key_hex) != 64:
@@ -74,6 +77,7 @@ class KeyManager:
 
 # ─── Hashing ──────────────────────────────────────────────────────────────────
 
+
 def sha3_256(data: bytes) -> str:
     """SHA-3-256 (Keccak). Retorna hex string lowercase."""
     return hashlib.sha3_256(data).hexdigest()
@@ -89,11 +93,8 @@ def compute_merkle_root(leaves: list[str]) -> str:
     nodes = list(leaves)
     while len(nodes) > 1:
         if len(nodes) % 2 != 0:
-            nodes.append(nodes[-1])   # duplica último nó se ímpar
-        nodes = [
-            sha3_256((nodes[i] + nodes[i + 1]).encode())
-            for i in range(0, len(nodes), 2)
-        ]
+            nodes.append(nodes[-1])  # duplica último nó se ímpar
+        nodes = [sha3_256((nodes[i] + nodes[i + 1]).encode()) for i in range(0, len(nodes), 2)]
     return nodes[0]
 
 

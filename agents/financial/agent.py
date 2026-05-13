@@ -1,4 +1,5 @@
 """AgroTrust AI – FinancialAnalystAgent."""
+
 from __future__ import annotations
 
 import structlog

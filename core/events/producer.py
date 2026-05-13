@@ -8,6 +8,7 @@ Garantias:
   - Serialização JSON com validação Pydantic antes do envio.
   - Dead Letter Queue (DLQ) automática em falha permanente.
 """
+
 from __future__ import annotations
 
 import json
@@ -36,7 +37,7 @@ class KafkaProducer:
 
     def __init__(self) -> None:
         self._settings = get_settings().kafka
-        self._producer: Any = None   # aiokafka.AIOKafkaProducer
+        self._producer: Any = None  # aiokafka.AIOKafkaProducer
 
     async def start(self) -> None:
         try:
@@ -86,9 +87,7 @@ class KafkaProducer:
                 reraise=True,
             ):
                 with attempt:
-                    await self._producer.send_and_wait(
-                        topic, value=payload, key=key, headers=headers
-                    )
+                    await self._producer.send_and_wait(topic, value=payload, key=key, headers=headers)
                     logger.info(
                         "event_published",
                         topic=topic,

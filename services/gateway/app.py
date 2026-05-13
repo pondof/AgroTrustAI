@@ -8,11 +8,12 @@ Entry-point HTTP do sistema. Responsabilidades:
   - Roteamento para criação/consulta de dossiês.
   - Métricas Prometheus e health check.
 """
+
 from __future__ import annotations
 
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import structlog
 from fastapi import FastAPI, Request

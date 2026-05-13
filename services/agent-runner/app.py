@@ -8,6 +8,7 @@ Execução (a partir da raiz do projeto):
     PYTHONPATH=. python services/agent-runner/app.py
     # Docker: WORKDIR /app, CMD ["python", "services/agent-runner/app.py"]
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -46,6 +47,7 @@ async def main() -> None:
 
     from core.config.settings import get_settings
     from core.events.topics import create_topics
+
     try:
         create_topics(get_settings().kafka.bootstrap_servers)
     except Exception as e:

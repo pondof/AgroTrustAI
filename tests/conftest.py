@@ -5,6 +5,7 @@ AgroTrust AI – Configuração global de testes.
 - Silencia o structlog durante toda a suíte (sem poluição de stdout).
 - Limpa o cache de get_settings() para que as env vars sejam refletidas.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,9 +24,7 @@ _GOV_ENV_VARS: dict[str, str] = {
 }
 
 
-def _drop_all_structlog_events(
-    logger: object, method: str, event_dict: dict
-) -> dict:  # pragma: no cover
+def _drop_all_structlog_events(logger: object, method: str, event_dict: dict) -> dict:  # pragma: no cover
     raise structlog.DropEvent()
 
 
@@ -43,6 +42,7 @@ def configure_test_environment() -> None:
 
     # Limpa o singleton de configurações para que as env vars sejam lidas novamente
     from core.config.settings import get_settings
+
     get_settings.cache_clear()
 
     # Silencia structlog durante toda a suíte

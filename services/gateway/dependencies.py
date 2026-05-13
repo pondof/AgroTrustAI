@@ -4,9 +4,10 @@ AgroTrust AI – Dependências FastAPI reutilizáveis do Gateway.
   - get_identity: extrai ServiceIdentity injetada pelo JWTAuthMiddleware.
   - require_scope: factory que retorna Depends() exigindo scope específico.
 """
+
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import HTTPException, Request, status
 

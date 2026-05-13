@@ -4,6 +4,7 @@ AgroTrust AI – Métricas Prometheus-compatible para o Gateway.
 Mantém implementação interna leve (sem dependência de prometheus_client) —
 expõe contadores de requests e histograma de latência via texto Prometheus.
 """
+
 from __future__ import annotations
 
 import threading
@@ -70,9 +71,7 @@ class GatewayMetrics:
         out.append("# TYPE gateway_requests_total counter")
         with self._lock:
             for (method, path, code), n in self._req_total.items():
-                out.append(
-                    f'gateway_requests_total{{method="{method}",path="{path}",status="{code}"}} {n}'
-                )
+                out.append(f'gateway_requests_total{{method="{method}",path="{path}",status="{code}"}} {n}')
         out.append("# HELP gateway_request_duration_seconds Latency per request.")
         out.append("# TYPE gateway_request_duration_seconds histogram")
         for (method, path), hist in self._req_latency.items():
@@ -94,7 +93,7 @@ def get_metrics() -> GatewayMetrics:
 class Timer:
     """Context manager para medir duração: `with Timer() as t: ... ; t.duration`."""
 
-    def __enter__(self) -> "Timer":
+    def __enter__(self) -> Timer:
         self._start = time.monotonic()
         return self
 

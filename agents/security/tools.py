@@ -9,6 +9,7 @@ com interfaces async prontas para integração com sistemas reais:
 
 O comportamento é determinístico para garantir reprodutibilidade nos testes.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -26,11 +27,11 @@ logger = structlog.get_logger(__name__)
 class LivenessResult(BaseModel):
     session_id: str
     passed: bool
-    score: float = Field(ge=0.0, le=1.0)   # 1.0 = definitivamente humano
+    score: float = Field(ge=0.0, le=1.0)  # 1.0 = definitivamente humano
 
 
 class DeepfakeResult(BaseModel):
-    media_url_hash: str                     # hash da URL (sem expor URL sensível)
+    media_url_hash: str  # hash da URL (sem expor URL sensível)
     deepfake_probability: float = Field(ge=0.0, le=1.0)
     voice_clone_probability: float = Field(ge=0.0, le=1.0)
     digital_mask_probability: float = Field(ge=0.0, le=1.0)
@@ -68,7 +69,7 @@ async def run_liveness_check(session_id: str) -> LivenessResult:
         return LivenessResult(session_id=session_id, passed=False, score=0.05)
 
     rng = _seeded_rng(f"liveness:{session_id}")
-    passed = rng.random() > 0.05      # 95% pass rate em condições normais
+    passed = rng.random() > 0.05  # 95% pass rate em condições normais
     score = rng.uniform(0.82, 0.99) if passed else rng.uniform(0.02, 0.35)
     logger.info("liveness_checked", session_id=session_id[:12] + "…", passed=passed, score=round(score, 3))
     return LivenessResult(session_id=session_id, passed=passed, score=round(score, 4))

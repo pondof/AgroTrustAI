@@ -6,9 +6,9 @@ Tests unitários – ESGAuditorAgent.
   2. CAR suspenso       → compliance_status=REJECTED
   3. Desmatamento pós-2008 → compliance_status=REJECTED
 """
+
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -74,6 +74,7 @@ _VC_VALID = VCCredentialResult(
 def reset_esg_graph():
     """Garante que o grafo LangGraph não fica cacheado entre testes."""
     import agents.esg.agent as _mod
+
     original = _mod._ESG_GRAPH
     _mod._ESG_GRAPH = None
     yield

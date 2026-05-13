@@ -8,6 +8,7 @@ Sobem cada mock como FastAPI TestClient (sem Docker) e validam:
 
 Execução: `pytest tests/contract/`.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -129,9 +130,7 @@ class TestGEE:
             assert -1.0 <= point["ndvi_mean"] <= 1.0
 
     def test_deforestation_returns_valid_geojson(self, gee_client: TestClient) -> None:
-        response = self._get_with_retry(
-            gee_client, f"/api/v1/deforestation/{_REGULAR_CAR}"
-        )
+        response = self._get_with_retry(gee_client, f"/api/v1/deforestation/{_REGULAR_CAR}")
         assert response.status_code == 200, response.text
         body = response.json()
         polygons = body["polygons"]
@@ -143,9 +142,7 @@ class TestGEE:
             assert isinstance(feat["geometry"]["coordinates"], list)
 
     def test_pa_property_has_deforestation_detected(self, gee_client: TestClient) -> None:
-        response = self._get_with_retry(
-            gee_client, f"/api/v1/deforestation/{_IRREGULAR_CAR}"
-        )
+        response = self._get_with_retry(gee_client, f"/api/v1/deforestation/{_IRREGULAR_CAR}")
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["deforestation_detected"] is True
@@ -222,13 +219,9 @@ class TestOpenFinance:
         assert response.status_code == 200
 
     def test_high_dti_consent(self, open_finance_client: TestClient) -> None:
-        response = open_finance_client.get(
-            "/api/v1/consents/CONSENT_HIGH_DTI_002/summary?months=6"
-        )
+        response = open_finance_client.get("/api/v1/consents/CONSENT_HIGH_DTI_002/summary?months=6")
         if response.status_code == 503:
-            response = open_finance_client.get(
-                "/api/v1/consents/CONSENT_HIGH_DTI_002/summary?months=6"
-            )
+            response = open_finance_client.get("/api/v1/consents/CONSENT_HIGH_DTI_002/summary?months=6")
         assert response.status_code == 200
         body = response.json()
         assert body["debt_to_income_ratio"] > 0.65, "Cenário high-DTI deve ter DTI > 0.65"
@@ -236,9 +229,7 @@ class TestOpenFinance:
 
     def test_seasonality_harvest_month(self, open_finance_client: TestClient) -> None:
         """Mês 5 ou 6 deve ter receita agro acima da média anual (sazonalidade safra)."""
-        response = open_finance_client.get(
-            "/api/v1/consents/CONSENT_REGULAR_001/transactions?months=12"
-        )
+        response = open_finance_client.get("/api/v1/consents/CONSENT_REGULAR_001/transactions?months=12")
         assert response.status_code == 200
         txs = response.json()
         agro = [t for t in txs if t["category"] == "receita_agro" and t["amount"] > 0]
@@ -247,16 +238,10 @@ class TestOpenFinance:
         harvest_txs = [t for t in agro if t["date"][5:7] in {"05", "06", "10", "11"}]
         if harvest_txs:
             avg_harvest = sum(t["amount"] for t in harvest_txs) / len(harvest_txs)
-            assert avg_harvest > avg, (
-                "Receita agro em meses de safra deve superar a média anual"
-            )
+            assert avg_harvest > avg, "Receita agro em meses de safra deve superar a média anual"
 
     def test_unknown_consent_returns_404(self, open_finance_client: TestClient) -> None:
-        response = open_finance_client.get(
-            "/api/v1/consents/CONSENT_NONEXISTENT_999/summary"
-        )
+        response = open_finance_client.get("/api/v1/consents/CONSENT_NONEXISTENT_999/summary")
         if response.status_code == 503:
-            response = open_finance_client.get(
-                "/api/v1/consents/CONSENT_NONEXISTENT_999/summary"
-            )
+            response = open_finance_client.get("/api/v1/consents/CONSENT_NONEXISTENT_999/summary")
         assert response.status_code == 404

@@ -11,6 +11,7 @@ Referências:
   - Mapbiomas (classes de uso do solo)
   - Marco do Código Florestal: 22/07/2008
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -320,10 +321,7 @@ def _build_ndvi_series(
         seasonal = 0.08 * (1 if cursor.month in {11, 12, 1, 2, 3} else -0.5)
         noise = rng.uniform(-0.04, 0.04)
         ndvi = baseline + seasonal + noise
-        if (
-            deforestation_event_offset_months is not None
-            and months >= deforestation_event_offset_months
-        ):
+        if deforestation_event_offset_months is not None and months >= deforestation_event_offset_months:
             ndvi -= 0.35  # queda abrupta após desmatamento
         ndvi = max(-1.0, min(1.0, ndvi))
         series.append(
@@ -440,9 +438,7 @@ async def get_deforestation(
         lat, lon = prop["centroid"]
         features.append(
             GeoJSONFeature(
-                geometry=GeoJSONPolygon(
-                    coordinates=_bbox_polygon(lat, lon, prop["area_total_ha"])
-                ),
+                geometry=GeoJSONPolygon(coordinates=_bbox_polygon(lat, lon, prop["area_total_ha"])),
                 properties={"polygon_id": f"{car_number}-bbox", "area_ha": 0.0},
             )
         )
@@ -510,9 +506,7 @@ async def get_alerts(
             DeforestationAlert(
                 alert_id=f"{raw['source']}-{rng.randint(100000, 999999)}",
                 source=raw["source"],
-                detected_at=(
-                    datetime.now(UTC) - timedelta(days=raw["days_ago"])
-                ).isoformat(),
+                detected_at=(datetime.now(UTC) - timedelta(days=raw["days_ago"])).isoformat(),
                 area_ha=raw["area_ha"],
                 severity=raw["severity"],
                 centroid_lat=round(lat + rng.uniform(-0.005, 0.005), 6),
@@ -570,9 +564,7 @@ async def batch_analyze(
         else:  # ndvi
             summary = {"ndvi_baseline": prop["ndvi_baseline"], "biome": prop["biome"]}
 
-        results.append(
-            BatchAnalyzeJobResult(car_number=car, status="completed", summary=summary)
-        )
+        results.append(BatchAnalyzeJobResult(car_number=car, status="completed", summary=summary))
 
     processed = sum(1 for r in results if r.status == "completed")
     return BatchAnalyzeResponse(

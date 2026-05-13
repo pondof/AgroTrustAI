@@ -7,6 +7,7 @@ Princípios:
   - Autorização baseada em scopes granulares (não papéis genéricos).
   - Tokens de serviço (S2S) têm TTL curto e são rotacionados automaticamente.
 """
+
 from __future__ import annotations
 
 import time
@@ -21,44 +22,48 @@ from core.config.settings import get_settings
 
 # ─── Scopes ──────────────────────────────────────────────────────────────────
 
+
 class Scope(str, Enum):
     """Escopos de autorização granulares por operação crítica."""
+
     # Subscrição
-    SUBSCRIPTION_READ    = "subscription:read"
-    SUBSCRIPTION_WRITE   = "subscription:write"
-    SUBSCRIPTION_APPROVE = "subscription:approve"     # apenas gestores FIAGRO
-    SUBSCRIPTION_REJECT  = "subscription:reject"
+    SUBSCRIPTION_READ = "subscription:read"
+    SUBSCRIPTION_WRITE = "subscription:write"
+    SUBSCRIPTION_APPROVE = "subscription:approve"  # apenas gestores FIAGRO
+    SUBSCRIPTION_REJECT = "subscription:reject"
 
     # Agentes
-    AGENT_ESG_RUN        = "agent:esg:run"
-    AGENT_FINANCIAL_RUN  = "agent:financial:run"
-    AGENT_SECURITY_RUN   = "agent:security:run"
-    AGENT_ORCHESTRATE    = "agent:orchestrate"
+    AGENT_ESG_RUN = "agent:esg:run"
+    AGENT_FINANCIAL_RUN = "agent:financial:run"
+    AGENT_SECURITY_RUN = "agent:security:run"
+    AGENT_ORCHESTRATE = "agent:orchestrate"
 
     # Auditoria
-    AUDIT_READ           = "audit:read"
-    AUDIT_EXPORT         = "audit:export"
+    AUDIT_READ = "audit:read"
+    AUDIT_EXPORT = "audit:export"
 
     # Administração
-    ADMIN_PARAMS         = "admin:params"             # parametrização tolerância risco
-    ADMIN_USERS          = "admin:users"
+    ADMIN_PARAMS = "admin:params"  # parametrização tolerância risco
+    ADMIN_USERS = "admin:users"
 
     # Integrações governamentais
-    GOV_CAR_READ         = "gov:car:read"
-    GOV_GEE_READ         = "gov:gee:read"
-    GOV_DATAPREV_READ    = "gov:dataprev:read"
+    GOV_CAR_READ = "gov:car:read"
+    GOV_GEE_READ = "gov:gee:read"
+    GOV_DATAPREV_READ = "gov:dataprev:read"
     GOV_OPENFINANCE_READ = "gov:openfinance:read"
 
 
 # ─── Identidade ───────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True, slots=True)
 class ServiceIdentity:
     """Identidade verificada de um serviço ou usuário humano."""
-    subject: str               # service_id ou user_id
-    tenant_id: str             # cooperativa / FIAGRO / banco
+
+    subject: str  # service_id ou user_id
+    tenant_id: str  # cooperativa / FIAGRO / banco
     scopes: frozenset[Scope]
-    is_service: bool = False   # True = token S2S entre microsserviços
+    is_service: bool = False  # True = token S2S entre microsserviços
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def has_scope(self, scope: Scope) -> bool:
@@ -67,12 +72,11 @@ class ServiceIdentity:
     def require_scope(self, scope: Scope) -> None:
         """Lança PermissionError se o scope não estiver presente."""
         if not self.has_scope(scope):
-            raise PermissionError(
-                f"Acesso negado: scope '{scope}' necessário para subject='{self.subject}'"
-            )
+            raise PermissionError(f"Acesso negado: scope '{scope}' necessário para subject='{self.subject}'")
 
 
 # ─── Token JWT ────────────────────────────────────────────────────────────────
+
 
 class TokenService:
     """Emite e valida tokens JWT para autenticação S2S e usuário."""
@@ -154,19 +158,29 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 ROLE_SCOPES: dict[str, list[Scope]] = {
     "gestor_fiagro": [
-        Scope.SUBSCRIPTION_READ, Scope.SUBSCRIPTION_APPROVE, Scope.SUBSCRIPTION_REJECT,
-        Scope.AUDIT_READ, Scope.ADMIN_PARAMS,
+        Scope.SUBSCRIPTION_READ,
+        Scope.SUBSCRIPTION_APPROVE,
+        Scope.SUBSCRIPTION_REJECT,
+        Scope.AUDIT_READ,
+        Scope.ADMIN_PARAMS,
     ],
     "analista_cooperativa": [
-        Scope.SUBSCRIPTION_READ, Scope.SUBSCRIPTION_WRITE,
-        Scope.AGENT_ESG_RUN, Scope.AGENT_FINANCIAL_RUN, Scope.AGENT_SECURITY_RUN,
+        Scope.SUBSCRIPTION_READ,
+        Scope.SUBSCRIPTION_WRITE,
+        Scope.AGENT_ESG_RUN,
+        Scope.AGENT_FINANCIAL_RUN,
+        Scope.AGENT_SECURITY_RUN,
         Scope.AUDIT_READ,
     ],
     "orchestrator_service": [
-        Scope.AGENT_ORCHESTRATE, Scope.AGENT_ESG_RUN,
-        Scope.AGENT_FINANCIAL_RUN, Scope.AGENT_SECURITY_RUN,
-        Scope.GOV_CAR_READ, Scope.GOV_GEE_READ,
-        Scope.GOV_DATAPREV_READ, Scope.GOV_OPENFINANCE_READ,
+        Scope.AGENT_ORCHESTRATE,
+        Scope.AGENT_ESG_RUN,
+        Scope.AGENT_FINANCIAL_RUN,
+        Scope.AGENT_SECURITY_RUN,
+        Scope.GOV_CAR_READ,
+        Scope.GOV_GEE_READ,
+        Scope.GOV_DATAPREV_READ,
+        Scope.GOV_OPENFINANCE_READ,
     ],
     "audit_service": [Scope.AUDIT_READ, Scope.AUDIT_EXPORT],
 }

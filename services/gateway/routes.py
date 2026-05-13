@@ -8,6 +8,7 @@ Endpoints:
   - GET  /health
   - GET  /metrics
 """
+
 from __future__ import annotations
 
 import uuid

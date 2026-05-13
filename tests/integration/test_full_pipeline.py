@@ -5,6 +5,7 @@ Moca todas as chamadas HTTP externas (SICAR, GEE, Dataprev, Open Finance)
 com respx, enquanto as ferramentas de segurança rodam como mocks determinísticos.
 Valida que o resultado final é um SubscriptionVerdictEvent bem-formado.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -80,6 +81,7 @@ _OPEN_FINANCE_RESPONSE = {
 @pytest.fixture(autouse=True)
 def reset_orchestrator_graph():
     import agents.orchestrator.graph as _mod
+
     original = _mod._ORCHESTRATOR_GRAPH
     _mod._ORCHESTRATOR_GRAPH = None
     yield
@@ -94,13 +96,9 @@ async def test_full_pipeline_produces_valid_verdict():
     Deve produzir um SubscriptionVerdictEvent válido com correlation_id e dossie_id corretos.
     """
     # SICAR mock
-    respx.get("http://localhost:8001/api/v1/car/" + _CAR).mock(
-        return_value=Response(200, json=_SICAR_RESPONSE)
-    )
+    respx.get("http://localhost:8001/api/v1/car/" + _CAR).mock(return_value=Response(200, json=_SICAR_RESPONSE))
     # GEE mock
-    respx.get("http://localhost:8002/api/v1/deforestation/" + _CAR).mock(
-        return_value=Response(200, json=_GEE_RESPONSE)
-    )
+    respx.get("http://localhost:8002/api/v1/deforestation/" + _CAR).mock(return_value=Response(200, json=_GEE_RESPONSE))
     # Dataprev mock (DID derivado de cpf_hash[:32])
     derived_did = f"did:gov:br:{_CPF_HASH[:32]}"
     respx.get(f"http://localhost:8003/api/v1/credentials/{derived_did}/verify").mock(
@@ -138,11 +136,7 @@ async def test_full_pipeline_produces_valid_verdict():
     assert 0.0 <= verdict.security_score <= 1000.0
 
     # Composite score coerente (pesos 0.35/0.45/0.20)
-    expected_composite = (
-        0.35 * verdict.esg_score
-        + 0.45 * verdict.financial_score
-        + 0.20 * verdict.security_score
-    )
+    expected_composite = 0.35 * verdict.esg_score + 0.45 * verdict.financial_score + 0.20 * verdict.security_score
     assert verdict.composite_score == pytest.approx(expected_composite, abs=1.0)
 
 
@@ -158,9 +152,7 @@ async def test_pipeline_with_deforestation_rejected():
         "deforestation_area_ha": 35.5,
     }
 
-    respx.get("http://localhost:8001/api/v1/car/" + _CAR).mock(
-        return_value=Response(200, json=_SICAR_RESPONSE)
-    )
+    respx.get("http://localhost:8001/api/v1/car/" + _CAR).mock(return_value=Response(200, json=_SICAR_RESPONSE))
     respx.get("http://localhost:8002/api/v1/deforestation/" + _CAR).mock(
         return_value=Response(200, json=gee_defo_response)
     )

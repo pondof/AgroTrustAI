@@ -1,4 +1,5 @@
 """AgroTrust AI – Schemas de entrada e saída do Agente Financeiro."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,5 +23,5 @@ class FinancialOutput(BaseModel):
     debt_to_income_ratio: float
     existing_rural_credit_brl: float
     recommended_credit_limit_brl: float
-    risk_tier: str            # "A" | "B" | "C" | "D" | "E"
+    risk_tier: str  # "A" | "B" | "C" | "D" | "E"
     xai_rationale: dict[str, Any]

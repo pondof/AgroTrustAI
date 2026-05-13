@@ -6,6 +6,7 @@ Grafo interno:
 
 Regra do Código Florestal: qualquer desmatamento pós-2008 → REJECTED automático.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

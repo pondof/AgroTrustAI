@@ -6,6 +6,7 @@ Cenários:
   2. Liveness falhou         → fraud_risk_level="critical"
   3. Tudo normal (baixa prob, liveness OK) → fraud_risk_level="low", kyc_passed=True
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch

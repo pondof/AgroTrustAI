@@ -8,6 +8,7 @@ Arquitetura:
   - Formato de linha compatível com exportação para SIEM (estruturado JSON).
   - Cumpre LGPD Art. 37 (registro de operações de tratamento) e exigências Bacen.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,49 +27,51 @@ logger = structlog.get_logger(__name__)
 
 # ─── Categorias de evento ─────────────────────────────────────────────────────
 
+
 class AuditEventType(str, Enum):
     # Subscrição
-    SUBSCRIPTION_INITIATED   = "subscription.initiated"
-    SUBSCRIPTION_ESG_RESULT  = "subscription.esg_result"
-    SUBSCRIPTION_FIN_RESULT  = "subscription.financial_result"
-    SUBSCRIPTION_APPROVED    = "subscription.approved"
-    SUBSCRIPTION_REJECTED    = "subscription.rejected"
+    SUBSCRIPTION_INITIATED = "subscription.initiated"
+    SUBSCRIPTION_ESG_RESULT = "subscription.esg_result"
+    SUBSCRIPTION_FIN_RESULT = "subscription.financial_result"
+    SUBSCRIPTION_APPROVED = "subscription.approved"
+    SUBSCRIPTION_REJECTED = "subscription.rejected"
 
     # Segurança / Identidade
-    BIOMETRIC_PASSED         = "security.biometric_passed"
-    BIOMETRIC_FAILED         = "security.biometric_failed"
-    DEEPFAKE_DETECTED        = "security.deepfake_detected"
-    TITLE_VERIFIED           = "security.title_verified"
-    TITLE_FRAUD_DETECTED     = "security.title_fraud_detected"
+    BIOMETRIC_PASSED = "security.biometric_passed"
+    BIOMETRIC_FAILED = "security.biometric_failed"
+    DEEPFAKE_DETECTED = "security.deepfake_detected"
+    TITLE_VERIFIED = "security.title_verified"
+    TITLE_FRAUD_DETECTED = "security.title_fraud_detected"
 
     # Acesso
-    AUTH_SUCCESS             = "auth.success"
-    AUTH_FAILURE             = "auth.failure"
-    PERMISSION_DENIED        = "auth.permission_denied"
+    AUTH_SUCCESS = "auth.success"
+    AUTH_FAILURE = "auth.failure"
+    PERMISSION_DENIED = "auth.permission_denied"
 
     # Dado sensível
-    PII_ACCESSED             = "data.pii_accessed"
-    PII_EXPORTED             = "data.pii_exported"
+    PII_ACCESSED = "data.pii_accessed"
+    PII_EXPORTED = "data.pii_exported"
 
     # Sistema
-    SYSTEM_CONFIG_CHANGED    = "system.config_changed"
-    AGENT_INVOKED            = "system.agent_invoked"
-    MOCK_USED                = "system.mock_used"
+    SYSTEM_CONFIG_CHANGED = "system.config_changed"
+    AGENT_INVOKED = "system.agent_invoked"
+    MOCK_USED = "system.mock_used"
 
 
 # ─── Estrutura de entrada de auditoria ───────────────────────────────────────
 
+
 @dataclass(slots=True)
 class AuditEntry:
-    event_id: str              # UUID v4
-    timestamp: str             # ISO-8601 UTC
+    event_id: str  # UUID v4
+    timestamp: str  # ISO-8601 UTC
     event_type: AuditEventType
-    subject: str               # quem executou (user_id ou service_id)
-    tenant_id: str             # cooperativa / FIAGRO
-    resource_id: str           # dossiê ID, propriedade ID etc.
-    outcome: str               # "success" | "failure" | "warning"
-    details: dict[str, Any]    # payload específico do evento (sem PII exposta em claro)
-    previous_hash: str         # hash da entrada anterior (encadeamento)
+    subject: str  # quem executou (user_id ou service_id)
+    tenant_id: str  # cooperativa / FIAGRO
+    resource_id: str  # dossiê ID, propriedade ID etc.
+    outcome: str  # "success" | "failure" | "warning"
+    details: dict[str, Any]  # payload específico do evento (sem PII exposta em claro)
+    previous_hash: str  # hash da entrada anterior (encadeamento)
     entry_hash: str = field(default="")  # preenchido após construção
 
     def compute_hash(self) -> str:
@@ -97,6 +100,7 @@ class AuditEntry:
 
 
 # ─── Repositório de auditoria ─────────────────────────────────────────────────
+
 
 class AuditRepository:
     """
@@ -187,6 +191,7 @@ def get_audit_repo() -> AuditRepository:
 
 # ─── Decorator de auditoria automática ───────────────────────────────────────
 
+
 def audited(
     event_type: AuditEventType,
     resource_id_kwarg: str = "dossie_id",
@@ -230,4 +235,5 @@ def audited(
                 raise
 
         return wrapper
+
     return decorator
