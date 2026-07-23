@@ -18,7 +18,10 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.db.engine import get_session
+from core.db.repositories.dossie import DossieRepository
 from core.events.schemas import PropertyLocation, SubscriptionInitiatedEvent
 from core.events.topics import TOPICS
 from core.security.audit import AuditEventType, get_audit_repo
@@ -55,11 +58,30 @@ class SubscriptionResponse(BaseModel):
     submitted_at: str
 
 
-class SubscriptionStatusResponse(BaseModel):
+class DossieDetailResponse(BaseModel):
+    """Detalhe do dossiê lido da projeção `dossies` (PostgreSQL)."""
+
     dossie_id: str
+    tenant_id: str
     status: str
-    last_event: str | None
-    score: float | None = None
+    verdict: str | None = None
+    car_number: str
+    credit_amount_brl: float
+    credit_purpose: str
+    property_area_ha: float
+    composite_score: float | None = None
+    esg_score: float | None = None
+    financial_score: float | None = None
+    security_score: float | None = None
+    approved_amount_brl: float | None = None
+    rejection_reasons: list[str] = Field(default_factory=list)
+    xai_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Resumo do XAI consolidado (bloco de scores). Detalhe completo em /xai.",
+    )
+    processing_time_ms: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class AuditTrailEntry(BaseModel):
@@ -155,34 +177,43 @@ async def create_subscription(
 
 @api_router.get(
     "/subscriptions/{dossie_id}",
-    response_model=SubscriptionStatusResponse,
+    response_model=DossieDetailResponse,
     responses={404: {"description": "Dossiê não encontrado"}},
 )
-async def get_subscription_status(
+async def get_subscription(
     dossie_id: str,
     identity: ServiceIdentity = Depends(require_scope(Scope.SUBSCRIPTION_READ)),
-) -> SubscriptionStatusResponse:
+    session: AsyncSession = Depends(get_session),
+) -> DossieDetailResponse:
     """
-    Consulta o status atual do dossiê.
+    Consulta o dossiê na projeção de leitura `dossies` do PostgreSQL.
 
-    Versão dev: deriva o status a partir da trilha de auditoria. Em produção
-    consulta o projection `dossies` do PostgreSQL.
+    O acesso é isolado por tenant (get_by_id filtra tenant_id no WHERE), evitando
+    vazamento de dados entre cooperativas.
     """
-    audit = get_audit_repo()
-    entries = await audit.get_by_resource(dossie_id)
-    if not entries:
+    record = await DossieRepository(session).get_by_id(dossie_id, identity.tenant_id)
+    if record is None:
         raise HTTPException(status_code=404, detail=f"Dossiê '{dossie_id}' não encontrado")
 
-    # tenant isolation – evita leak entre cooperativas
-    relevant = [e for e in entries if e.tenant_id == identity.tenant_id]
-    if not relevant:
-        raise HTTPException(status_code=404, detail=f"Dossiê '{dossie_id}' não encontrado")
-
-    last = relevant[-1]
-    return SubscriptionStatusResponse(
-        dossie_id=dossie_id,
-        status=last.event_type.value,
-        last_event=last.timestamp,
+    return DossieDetailResponse(
+        dossie_id=record.dossie_id,
+        tenant_id=record.tenant_id,
+        status=record.status,
+        verdict=record.verdict,
+        car_number=record.car_number,
+        credit_amount_brl=record.credit_amount_brl,
+        credit_purpose=record.credit_purpose,
+        property_area_ha=record.property_area_ha,
+        composite_score=record.composite_score,
+        esg_score=record.esg_score,
+        financial_score=record.financial_score,
+        security_score=record.security_score,
+        approved_amount_brl=record.approved_amount_brl,
+        rejection_reasons=record.rejection_reasons,
+        xai_summary=record.xai_consolidated_rationale.get("scores", {}),
+        processing_time_ms=record.processing_time_ms,
+        created_at=record.created_at.isoformat() if record.created_at else None,
+        updated_at=record.updated_at.isoformat() if record.updated_at else None,
     )
 
 

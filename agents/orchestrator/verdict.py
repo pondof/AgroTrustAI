@@ -20,17 +20,13 @@ from agents.esg.schemas import ESGOutput
 from agents.financial.schemas import FinancialOutput
 from agents.orchestrator.state import DossieState
 from agents.security.schemas import SecurityOutput
+from core.db.repositories.params import RiskParams, resolve_params
 from core.events.schemas import ESGComplianceStatus, SubscriptionVerdictEvent
 
 logger = structlog.get_logger(__name__)
 
-# ─── Pesos do composite score ─────────────────────────────────────────────────
-_W_ESG = 0.35
-_W_FIN = 0.45
-_W_SEC = 0.20
-
-_APPROVE_THRESHOLD = 600.0
-_MANUAL_THRESHOLD = 450.0
+# Pesos/limiares padrão vivem em core.db.repositories.params (RiskParams.defaults):
+# 0.35/0.45/0.20 e limiares 600/450. VerdictEngine resolve por tenant via cache.
 
 
 def _esg_to_score(esg: ESGOutput) -> float:
@@ -76,26 +72,42 @@ def _build_rejection_reasons(
 
 
 class VerdictEngine:
-    """Compõe o veredicto final a partir das saídas dos 3 agentes."""
+    """
+    Compõe o veredicto final a partir das saídas dos 3 agentes.
+
+    Os pesos e limiares vêm de risk_params do tenant (via RiskParamsCache) quando
+    disponíveis; caso contrário usa os defaults hardcoded (0.35/0.45/0.20, 600/450).
+    Um override explícito de RiskParams pode ser injetado (útil em testes).
+    """
+
+    def __init__(self, params: RiskParams | None = None) -> None:
+        self._params_override = params
+
+    def _params(self, state: DossieState) -> RiskParams:
+        if self._params_override is not None:
+            return self._params_override
+        return resolve_params(state.get("tenant_id", ""))
 
     def compute(self, state: DossieState) -> SubscriptionVerdictEvent:
         esg: ESGOutput | None = state.get("esg_output")
         fin: FinancialOutput | None = state.get("financial_output")
         sec: SecurityOutput | None = state.get("security_output")
 
+        params = self._params(state)
+
         start_time = float(state.get("start_time_unix") or time.time())
         processing_ms = int((time.time() - start_time) * 1000)
 
         # Short-circuit: apenas security disponível (fraud crítico)
         if sec and not esg and not fin:
-            return self._short_circuit_verdict(state, sec, processing_ms)
+            return self._short_circuit_verdict(state, sec, processing_ms, params)
 
         # Fallback seguro se algum agente falhou
         esg_score = _esg_to_score(esg) if esg else 0.0
         fin_score = fin.trust_score if fin else 0.0
         sec_score = _security_to_score(sec) if sec else 0.0
 
-        composite = _W_ESG * esg_score + _W_FIN * fin_score + _W_SEC * sec_score
+        composite = params.w_esg * esg_score + params.w_financial * fin_score + params.w_security * sec_score
 
         esg_approved = esg and esg.compliance_status == ESGComplianceStatus.APPROVED
         fraud_ok = sec and sec.fraud_risk_level not in {"critical", "high"}
@@ -107,11 +119,11 @@ class VerdictEngine:
             or not sec
         )
 
-        if composite >= _APPROVE_THRESHOLD and esg_approved and fraud_ok:
+        if composite >= params.approve_threshold and esg_approved and fraud_ok:
             verdict_str = "approved"
             approved_amount: float | None = fin.recommended_credit_limit_brl if fin else None
             rejection_reasons: list[str] = []
-        elif composite >= _MANUAL_THRESHOLD or has_warning:
+        elif composite >= params.manual_threshold or has_warning:
             verdict_str = "manual_review"
             approved_amount = None
             rejection_reasons = []
@@ -160,6 +172,7 @@ class VerdictEngine:
         state: DossieState,
         sec: SecurityOutput,
         processing_ms: int,
+        params: RiskParams,
     ) -> SubscriptionVerdictEvent:
         reason = state.get("short_circuit_reason", "Fraude crítica detectada pelo Agente de Segurança")
         logger.warning(
@@ -168,7 +181,7 @@ class VerdictEngine:
             fraud_risk=sec.fraud_risk_level,
         )
         sec_score = _security_to_score(sec)
-        composite = _W_SEC * sec_score
+        composite = params.w_security * sec_score
         return SubscriptionVerdictEvent(
             correlation_id=state.get("correlation_id", ""),
             tenant_id=state.get("tenant_id", ""),

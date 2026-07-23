@@ -33,6 +33,7 @@ from .middlewares import (
     RateLimitMiddleware,
 )
 from .routes import api_router, infra_router
+from .routes_params import params_router
 
 logger = structlog.get_logger(__name__)
 
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
 
     app.include_router(infra_router)
     app.include_router(api_router)
+    app.include_router(params_router)
     return app
 
 

@@ -1,0 +1,135 @@
+version: "3.9"
+
+# AgroTrust AI – Stack de APLICAÇÃO (Fase 2)
+#
+# Sobe: gateway + agent-runner + 3 microsserviços de agente (ESG/Financeiro/Segurança).
+# Depende da infra (docker-compose.yml → Kafka/PostgreSQL/Redis) e dos mocks
+# (docker-compose.mocks.yml) já no ar, ligados pela rede externa agrotrust-net.
+#
+# NOTA: depends_on não cruza projetos compose; a ordem é garantida pelo `make stack-up`
+# (infra-up → mocks-up → app-up). Os serviços têm restart+healthcheck para tolerar
+# a infra ainda inicializando.
+
+name: agrotrust-app
+
+networks:
+  agrotrust-net:
+    external: true
+    name: agrotrust-infra_agrotrust-net
+
+# ─── Ambiente comum (âncoras YAML) ───────────────────────────────────────────
+x-app-env: &app-env
+  ENVIRONMENT: dev
+  LOG_LEVEL: INFO
+  KAFKA_BOOTSTRAP_SERVERS: agrotrust-kafka:29092
+  DB_URL: postgresql+asyncpg://agrotrust:agrotrust_dev_password@agrotrust-postgres:5432/agrotrust
+  SEC_JWT_SECRET: dev-shared-jwt-secret-change-me
+  SEC_JWT_ALGORITHM: HS256
+  GOV_SICAR_BASE_URL: http://agrotrust-mock-sicar:8001
+  GOV_GEE_BASE_URL: http://agrotrust-mock-gee:8002
+  GOV_DATAPREV_BASE_URL: http://agrotrust-mock-dataprev:8003
+  GOV_OPEN_FINANCE_BASE_URL: http://agrotrust-mock-open-finance:8004
+
+services:
+
+  # ─── API Gateway ───────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    image: agrotrust/gateway:dev
+    container_name: agrotrust-gateway
+    networks: [agrotrust-net]
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-gateway
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ─── Agent Runner (consumer Kafka do orquestrador) ─────────────────────────
+  agent-runner:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent-runner
+    image: agrotrust/agent-runner:dev
+    container_name: agrotrust-agent-runner
+    networks: [agrotrust-net]
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-agent-runner
+    restart: unless-stopped
+    mem_limit: 512m
+
+  # ─── Microsserviço ESG ─────────────────────────────────────────────────────
+  agent-esg:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent-esg
+    image: agrotrust/agent-esg:dev
+    container_name: agrotrust-agent-esg
+    networks: [agrotrust-net]
+    ports:
+      - "8010:8010"
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-agent-esg
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ─── Microsserviço Financeiro ──────────────────────────────────────────────
+  agent-financial:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent-financial
+    image: agrotrust/agent-financial:dev
+    container_name: agrotrust-agent-financial
+    networks: [agrotrust-net]
+    ports:
+      - "8011:8011"
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-agent-financial
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ─── Microsserviço de Segurança ────────────────────────────────────────────
+  agent-security:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent-security
+    image: agrotrust/agent-security:dev
+    container_name: agrotrust-agent-security
+    networks: [agrotrust-net]
+    ports:
+      - "8012:8012"
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-agent-security
+    restart: unless-stopped
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

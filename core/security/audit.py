@@ -12,6 +12,7 @@ Arquitetura:
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -179,14 +180,36 @@ class AuditRepository:
 
 # ─── Singleton global ─────────────────────────────────────────────────────────
 
-_audit_repo: AuditRepository | None = None
+_audit_repo: Any | None = None
 
 
-def get_audit_repo() -> AuditRepository:
+def get_audit_repo() -> Any:
+    """
+    Devolve o repositório de auditoria como singleton de processo.
+
+    Quando a env var DB_URL está configurada (produção/staging), usa a implementação
+    persistida em PostgreSQL (append-only via RLS). Caso contrário (testes/dev sem
+    banco), usa a implementação in-memory desta módulo. Ambas expõem a mesma
+    interface pública (append/verify_chain/get_by_resource/export_jsonlines).
+    """
     global _audit_repo
     if _audit_repo is None:
-        _audit_repo = AuditRepository()
+        if os.environ.get("DB_URL"):
+            # Import tardio: evita ciclo core.security.audit ↔ core.db.repositories.audit.
+            from core.db.repositories.audit import PersistedAuditRepository
+
+            _audit_repo = PersistedAuditRepository()
+            logger.info("audit_repo_backend_selected", backend="postgres")
+        else:
+            _audit_repo = AuditRepository()
+            logger.info("audit_repo_backend_selected", backend="in-memory")
     return _audit_repo
+
+
+def reset_audit_repo() -> None:
+    """Limpa o singleton (usado em testes que alternam backends)."""
+    global _audit_repo
+    _audit_repo = None
 
 
 # ─── Decorator de auditoria automática ───────────────────────────────────────

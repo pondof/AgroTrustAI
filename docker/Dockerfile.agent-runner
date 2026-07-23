@@ -1,0 +1,31 @@
+# AgroTrust AI – Agent Runner (consumer Kafka do orquestrador)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8005
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc libpq-dev curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir -e ".[core,ml]"
+
+COPY core/ ./core/
+COPY agents/ ./agents/
+COPY services/ ./services/
+COPY mocks/ ./mocks/
+
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
+# O agent-runner é um worker Kafka (sem HTTP); o healthcheck valida o processo Python
+# e a conectividade Kafka via um probe leve do próprio módulo.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import socket,os; h,p=os.environ.get('KAFKA_BOOTSTRAP_SERVERS','kafka:29092').split(',')[0].split(':'); s=socket.create_connection((h,int(p)),3); s.close()" || exit 1
+
+CMD ["python", "services/agent-runner/app.py"]

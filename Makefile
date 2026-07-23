@@ -1,4 +1,5 @@
-.PHONY: help install dev test lint type-check security-scan mocks-up mocks-down infra-up infra-down
+.PHONY: help install dev test lint type-check security-scan mocks-up mocks-down infra-up infra-down \
+        app-build app-up app-down app-logs migrate stack-up stack-down
 
 PYTHON := python3.11
 PIP    := pip install --break-system-packages
@@ -58,6 +59,35 @@ logs: ## Tails dos logs de todos os serviços
 
 kafka-topics: ## Lista tópicos Kafka
 	docker exec agrotrust-kafka kafka-topics.sh --list --bootstrap-server localhost:9092
+
+app-build: ## Build das imagens da aplicação (gateway + agentes)
+	docker compose -f docker/docker-compose.app.yml build
+
+app-up: ## Sobe a stack de aplicação (requer infra + mocks no ar)
+	docker compose -f docker/docker-compose.app.yml up -d
+	@echo "Aplicação disponível:"
+	@echo "  Gateway:          http://localhost:8000  (docs em /docs)"
+	@echo "  Agent ESG:        http://localhost:8010"
+	@echo "  Agent Financeiro: http://localhost:8011"
+	@echo "  Agent Segurança:  http://localhost:8012"
+
+app-down: ## Derruba a stack de aplicação
+	docker compose -f docker/docker-compose.app.yml down
+
+app-logs: ## Tail dos logs da aplicação
+	docker compose -f docker/docker-compose.app.yml logs -f
+
+migrate: ## Aplica a migração 001 no PostgreSQL da infra
+	docker cp core/db/migrations/001_initial.sql agrotrust-postgres:/tmp/001_initial.sql
+	docker exec agrotrust-postgres psql -U agrotrust -d agrotrust -f /tmp/001_initial.sql
+
+stack-up: infra-up mocks-up app-build app-up ## Ambiente completo (infra + mocks + aplicação) com um comando
+	@echo "Aguardando PostgreSQL..." && sleep 5
+	@$(MAKE) migrate
+	@echo "✅ Stack completo no ar. Rode 'make app-logs' para acompanhar."
+
+stack-down: app-down mocks-down infra-down ## Derruba o stack completo
+	@echo "Stack derrubado."
 
 clean: ## Limpa artefatos de build e cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

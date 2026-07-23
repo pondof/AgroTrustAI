@@ -1,0 +1,33 @@
+# AgroTrust AI – API Gateway (FastAPI/uvicorn)
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PORT=8000
+
+# gcc/libpq-dev para asyncpg; curl para o HEALTHCHECK.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc libpq-dev curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir -e ".[core,ml]"
+
+COPY core/ ./core/
+COPY agents/ ./agents/
+COPY services/ ./services/
+COPY mocks/ ./mocks/
+
+# Usuário não-root (least privilege).
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f "http://localhost:${PORT}/health" || exit 1
+
+CMD ["uvicorn", "services.gateway.app:app", "--host", "0.0.0.0", "--port", "8000"]
