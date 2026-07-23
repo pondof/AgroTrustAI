@@ -78,9 +78,7 @@ class SubscriptionConsumer(BaseConsumer):
 
             from core.db.engine import get_engine
 
-            self._session_factory = async_sessionmaker(
-                bind=get_engine(), class_=AsyncSession, expire_on_commit=False
-            )
+            self._session_factory = async_sessionmaker(bind=get_engine(), class_=AsyncSession, expire_on_commit=False)
         return self._session_factory
 
     async def _persist_initiated(self, event: SubscriptionInitiatedEvent) -> None:

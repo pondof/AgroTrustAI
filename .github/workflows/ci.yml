@@ -46,7 +46,8 @@ jobs:
             pynacl numpy scikit-learn shap xgboost \
             shapely geopandas pyproj \
             langchain-core langgraph \
-            aiokafka kafka-python
+            aiokafka kafka-python \
+            "sqlalchemy[asyncio]" aiosqlite greenlet
       - name: Run unit tests
         run: pytest tests/unit/ -v --cov=core --cov=mocks --cov=agents --cov-report=xml --tb=short --override-ini="addopts="
       - name: Upload coverage
@@ -70,7 +71,8 @@ jobs:
           pip install --prefer-binary \
             pytest pytest-asyncio httpx fastapi uvicorn \
             pydantic pydantic-settings structlog \
-            python-jose "passlib[bcrypt]" "bcrypt<4.0" cryptography tenacity pynacl faker
+            python-jose "passlib[bcrypt]" "bcrypt<4.0" cryptography tenacity pynacl faker \
+            "sqlalchemy[asyncio]" aiosqlite greenlet
       - name: Run contract tests
         # Override addopts (que inclui --cov=agents) para não exigir agents/ imports
         run: pytest tests/contract/ -v --tb=short --override-ini="addopts="
