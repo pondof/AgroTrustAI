@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Relatório de Compliance – {{ dossie.id }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 22mm 16mm 24mm 16mm;
+      @bottom-center {
+        content: "AgroTrust AI · Documento gerado automaticamente · Página " counter(page) " de " counter(pages);
+        font-size: 7pt;
+        color: #6b7280;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: #1f2937;
+      font-size: 9.5pt;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .brand { display: flex; align-items: center; border-bottom: 3px solid #15803d; padding-bottom: 8px; }
+    .brand .mark {
+      width: 34px; height: 34px; border-radius: 8px; margin-right: 10px;
+      background: #15803d; color: #fff; font-weight: 700; font-size: 16pt;
+      text-align: center; line-height: 34px;
+    }
+    .brand .name { font-size: 15pt; font-weight: 700; color: #14532d; }
+    .brand .sub { font-size: 8pt; color: #6b7280; }
+    .doc-title { font-size: 13pt; font-weight: 700; margin: 14px 0 2px; color: #111827; }
+    .doc-meta { font-size: 8pt; color: #6b7280; margin-bottom: 14px; }
+    h2 {
+      font-size: 10.5pt; color: #14532d; border-left: 4px solid #15803d;
+      padding-left: 8px; margin: 18px 0 8px;
+    }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th { background: #f0fdf4; color: #14532d; font-size: 8pt; text-transform: uppercase; letter-spacing: .02em; }
+    .kv td:first-child { color: #6b7280; width: 34%; }
+    .scores { display: table; width: 100%; }
+    .score-card {
+      display: table-cell; width: 25%; padding: 8px; text-align: center;
+      border: 1px solid #e5e7eb; border-radius: 6px;
+    }
+    .score-card .label { font-size: 7.5pt; color: #6b7280; text-transform: uppercase; }
+    .score-card .val { font-size: 18pt; font-weight: 700; }
+    .band-high { color: #15803d; }
+    .band-mid { color: #b45309; }
+    .band-low { color: #b91c1c; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 8pt; font-weight: 700; text-transform: uppercase;
+    }
+    .badge.approved { background: #dcfce7; color: #166534; }
+    .badge.rejected { background: #fee2e2; color: #991b1b; }
+    .badge.manual_review { background: #ffedd5; color: #9a3412; }
+    .badge.initiated { background: #e5e7eb; color: #374151; }
+    .impact-pos { color: #15803d; font-weight: 600; }
+    .impact-neg { color: #b91c1c; font-weight: 600; }
+    .legal { font-size: 8.5pt; }
+    .legal td:first-child { font-weight: 700; color: #14532d; white-space: nowrap; }
+    .footer {
+      margin-top: 22px; border-top: 1px solid #e5e7eb; padding-top: 8px;
+      font-size: 7.5pt; color: #6b7280;
+    }
+    .hash { font-family: "Courier New", monospace; word-break: break-all; color: #374151; }
+    .sig { margin-top: 6px; font-size: 8pt; }
+    .sig.ok { color: #166534; }
+    .sig.no { color: #9a3412; }
+    .disclaimer { margin-top: 8px; font-style: italic; }
+    .muted { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="brand">
+    <div class="mark">A</div>
+    <div>
+      <div class="name">AgroTrust&nbsp;AI</div>
+      <div class="sub">Subscrição Agêntica de Crédito Rural</div>
+    </div>
+  </div>
+
+  <div class="doc-title">Relatório de Compliance da Subscrição</div>
+  <div class="doc-meta">
+    Relatório {{ meta.report_id }} · Gerado em {{ meta.generated_at }} · Solicitado por {{ meta.generated_by }}
+  </div>
+
+  <h2>1. Identificação do Dossiê</h2>
+  <table class="kv">
+    <tr><td>Dossiê</td><td><strong>{{ dossie.id }}</strong></td></tr>
+    <tr><td>Tenant</td><td>{{ dossie.tenant_id }}</td></tr>
+    <tr><td>Status / Veredicto</td>
+        <td><span class="badge {{ dossie.status }}">{{ dossie.status }}</span>
+        {% if dossie.verdict %}<span class="badge {{ dossie.verdict }}">{{ dossie.verdict }}</span>{% endif %}</td></tr>
+    <tr><td>CAR</td><td>{{ dossie.car_number }}</td></tr>
+    <tr><td>Hash CPF (SHA-3-256)</td><td class="hash">{{ dossie.cpf_hash_masked }}</td></tr>
+    <tr><td>Área da propriedade</td><td>{{ dossie.property_area_ha }} ha</td></tr>
+    <tr><td>Finalidade do crédito</td><td>{{ dossie.credit_purpose }}</td></tr>
+    <tr><td>Valor solicitado</td><td>{{ dossie.credit_amount_brl | brl }}</td></tr>
+    <tr><td>Valor aprovado</td><td>{{ dossie.approved_amount_brl | brl }}</td></tr>
+    <tr><td>Aberto por</td><td>{{ dossie.requested_by }}</td></tr>
+  </table>
+
+  <h2>2. Scores da Decisão</h2>
+  <div class="scores">
+    {% set bands = [('ESG', scores.esg), ('Financeiro', scores.financial), ('Segurança', scores.security), ('Composto', scores.composite)] %}
+    {% for label, val in bands %}
+    <div class="score-card">
+      <div class="label">{{ label }}</div>
+      <div class="val {% if val is none %}muted{% elif val >= 600 %}band-high{% elif val >= 450 %}band-mid{% else %}band-low{% endif %}">
+        {{ val | score }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if dossie.rejection_reasons %}
+  <p><strong>Motivos de reprovação:</strong></p>
+  <ul>{% for r in dossie.rejection_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h2>3. Explicabilidade (XAI) por Agente</h2>
+  {% for agent in agents %}
+  <p style="margin:10px 0 2px;">
+    <strong>{{ agent.title }}</strong>
+    — score <strong>{{ agent.score | score }}</strong>
+    {% if agent.decision %}· decisão: {{ agent.decision }}{% endif %}
+    {% if agent.confidence is not none %}· confiança: {{ agent.confidence | pct }}{% endif %}
+  </p>
+  {% if agent.factors %}
+  <table>
+    <thead><tr><th>Fator</th><th>Peso</th><th>Valor</th><th>Impacto</th></tr></thead>
+    <tbody>
+    {% for f in agent.factors %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td>{{ f.weight }}</td>
+        <td>{{ f.value }}</td>
+        <td class="{% if f.impact is number %}{{ 'impact-pos' if f.impact >= 0 else 'impact-neg' }}{% elif 'pos' in (f.impact|string|lower) %}impact-pos{% elif 'neg' in (f.impact|string|lower) %}impact-neg{% endif %}">
+          {{ f.impact }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Sem fatores registrados para este agente.</p>
+  {% endif %}
+  {% endfor %}
+
+  <h2>4. Trilha de Auditoria (resumo)</h2>
+  {% if audit %}
+  <table>
+    <thead><tr><th>Evento</th><th>Quando</th><th>Sujeito</th><th>Resultado</th><th>Hash</th></tr></thead>
+    <tbody>
+    {% for a in audit %}
+      <tr>
+        <td>{{ a.event_type }}</td>
+        <td>{{ a.timestamp }}</td>
+        <td>{{ a.subject }}</td>
+        <td>{{ a.outcome }}</td>
+        <td class="hash">{{ a.entry_hash_short }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nenhum evento de auditoria registrado para este dossiê.</p>
+  {% endif %}
+
+  <h2>5. Fundamento Legal</h2>
+  <table class="legal">
+    {% for ref, desc in legal_references %}
+    <tr><td>{{ ref }}</td><td>{{ desc }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <div class="footer">
+    <div><strong>Hash da cadeia de auditoria (cabeça):</strong></div>
+    <div class="hash">{{ meta.chain_head_hash or 'sem entradas' }}</div>
+    <div style="margin-top:4px;">Entradas de auditoria consideradas: {{ meta.audit_entries }}</div>
+    {% if meta.signed %}
+    <div class="sig ok">✔ Documento assinado digitalmente (PAdES) por: {{ meta.signer_subject }}</div>
+    {% else %}
+    <div class="sig no">⚠ Documento NÃO assinado (ambiente de desenvolvimento).</div>
+    {% endif %}
+    <div class="disclaimer">
+      Documento gerado automaticamente pela plataforma AgroTrust AI em {{ meta.generated_at }}.
+      Decisões automatizadas são passíveis de revisão humana (LGPD, Art. 20). Este relatório
+      consolida dados tratados sob as bases legais aplicáveis e não substitui a análise formal
+      de crédito da instituição financeira.
+    </div>
+  </div>
+</body>
+</html>

@@ -43,12 +43,14 @@ class KafkaProducer:
         try:
             from aiokafka import AIOKafkaProducer  # type: ignore[import]
 
+            # enable_idempotence=True já garante ordenação e limita as in-flight
+            # requests internamente; o kwarg max_in_flight_requests_per_connection
+            # não é aceito pelo AIOKafkaProducer (foi removido em versões recentes).
             self._producer = AIOKafkaProducer(
                 bootstrap_servers=self._settings.bootstrap_servers,
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
                 acks="all",
                 enable_idempotence=True,
-                max_in_flight_requests_per_connection=1,
                 compression_type="gzip",
             )
             await self._producer.start()

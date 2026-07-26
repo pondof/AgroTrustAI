@@ -24,7 +24,9 @@ from core.security.iam import ServiceIdentity, TokenService
 logger = structlog.get_logger(__name__)
 
 CORRELATION_HEADER: str = "X-Correlation-ID"
-PUBLIC_PATHS: frozenset[str] = frozenset({"/health", "/metrics", "/docs", "/openapi.json", "/redoc"})
+PUBLIC_PATHS: frozenset[str] = frozenset(
+    {"/health", "/metrics", "/docs", "/openapi.json", "/redoc", "/token"}
+)
 
 
 class CorrelationIdMiddleware(BaseHTTPMiddleware):

@@ -1,8 +1,15 @@
 .PHONY: help install dev test lint type-check security-scan mocks-up mocks-down infra-up infra-down \
-        app-build app-up app-down app-logs migrate stack-up stack-down
+        app-build app-up app-down app-logs migrate stack-up stack-down \
+        frontend-dev frontend-build frontend-test report-up report-build report-test
 
 PYTHON := python3.11
 PIP    := pip install --break-system-packages
+NPM    := npm --prefix frontend
+
+# Detecta o Compose disponível: plugin v2 ("docker compose") ou binário v1 ("docker-compose").
+COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; \
+                   elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; \
+                   else echo "docker compose"; fi)
 
 help:
 	@echo "AgroTrust AI – Comandos disponíveis:"
@@ -32,7 +39,7 @@ security-scan: ## SAST com semgrep
 	semgrep --config=auto core/ mocks/ services/
 
 mocks-up: ## Sobe todos os mocks de APIs governamentais
-	docker compose -f docker/docker-compose.mocks.yml up -d
+	$(COMPOSE) -f docker/docker-compose.mocks.yml up -d
 	@echo "Mocks disponíveis:"
 	@echo "  CAR/SICAR:    http://localhost:8001"
 	@echo "  Google Earth: http://localhost:8002"
@@ -40,42 +47,44 @@ mocks-up: ## Sobe todos os mocks de APIs governamentais
 	@echo "  Open Finance: http://localhost:8004"
 
 mocks-down: ## Derruba mocks
-	docker-compose -f docker/docker-compose.mocks.yml down
+	$(COMPOSE) -f docker/docker-compose.mocks.yml down
 
 infra-up: ## Sobe infraestrutura completa (Kafka, Zookeeper, Redis, PG)
-	docker-compose -f docker/docker-compose.yml up -d
+	$(COMPOSE) -f docker/docker-compose.yml up -d
 	@echo "Aguardando Kafka ficar pronto..."
 	@sleep 10
 	$(PYTHON) -m core.events.topics create
 
 infra-down: ## Derruba infraestrutura
-	docker-compose -f docker/docker-compose.yml down -v
+	$(COMPOSE) -f docker/docker-compose.yml down -v
 
 dev: infra-up mocks-up ## Ambiente de desenvolvimento completo
 	@echo "✅ Ambiente de desenvolvimento pronto!"
 
 logs: ## Tails dos logs de todos os serviços
-	docker compose -f docker/docker-compose.yml logs -f
+	$(COMPOSE) -f docker/docker-compose.yml logs -f
 
 kafka-topics: ## Lista tópicos Kafka
 	docker exec agrotrust-kafka kafka-topics.sh --list --bootstrap-server localhost:9092
 
 app-build: ## Build das imagens da aplicação (gateway + agentes)
-	docker compose -f docker/docker-compose.app.yml build
+	$(COMPOSE) -f docker/docker-compose.app.yml build
 
 app-up: ## Sobe a stack de aplicação (requer infra + mocks no ar)
-	docker compose -f docker/docker-compose.app.yml up -d
+	$(COMPOSE) -f docker/docker-compose.app.yml up -d
 	@echo "Aplicação disponível:"
+	@echo "  Frontend:         http://localhost:5173"
 	@echo "  Gateway:          http://localhost:8000  (docs em /docs)"
 	@echo "  Agent ESG:        http://localhost:8010"
 	@echo "  Agent Financeiro: http://localhost:8011"
 	@echo "  Agent Segurança:  http://localhost:8012"
+	@echo "  Report Service:   http://localhost:8020"
 
 app-down: ## Derruba a stack de aplicação
-	docker compose -f docker/docker-compose.app.yml down
+	$(COMPOSE) -f docker/docker-compose.app.yml down
 
 app-logs: ## Tail dos logs da aplicação
-	docker compose -f docker/docker-compose.app.yml logs -f
+	$(COMPOSE) -f docker/docker-compose.app.yml logs -f
 
 migrate: ## Aplica a migração 001 no PostgreSQL da infra
 	docker cp core/db/migrations/001_initial.sql agrotrust-postgres:/tmp/001_initial.sql
@@ -88,6 +97,32 @@ stack-up: infra-up mocks-up app-build app-up ## Ambiente completo (infra + mocks
 
 stack-down: app-down mocks-down infra-down ## Derruba o stack completo
 	@echo "Stack derrubado."
+
+# ─── Frontend (Fase 3) ───────────────────────────────────────────────────────
+
+frontend-dev: ## Sobe o dev-server do frontend (Vite, :5173, proxy /api → :8000)
+	$(NPM) install
+	$(NPM) run dev
+
+frontend-build: ## Build de produção do frontend (dist/)
+	$(NPM) install
+	$(NPM) run build
+
+frontend-test: ## Roda os testes do frontend (Vitest)
+	$(NPM) install
+	$(NPM) run test
+
+# ─── Report Service (Fase 3) ─────────────────────────────────────────────────
+
+report-build: ## Build da imagem do report-service
+	$(COMPOSE) -f docker/docker-compose.app.yml build report-service
+
+report-up: ## Sobe o report-service (:8020) via compose de aplicação
+	$(COMPOSE) -f docker/docker-compose.app.yml up -d report-service
+	@echo "Report service: http://localhost:8020  (POST /reports/{dossie_id})"
+
+report-test: ## Roda os testes do report-service (pula se WeasyPrint/PyHanko ausentes)
+	pytest services/report-service/tests/ -v -o addopts="" -rs
 
 clean: ## Limpa artefatos de build e cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

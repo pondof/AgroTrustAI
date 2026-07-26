@@ -11,23 +11,26 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import PlainTextResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.engine import get_session
-from core.db.repositories.dossie import DossieRepository
+from core.db.repositories.dossie import DossieRecord, DossieRepository
 from core.events.schemas import PropertyLocation, SubscriptionInitiatedEvent
 from core.events.topics import TOPICS
 from core.security.audit import AuditEventType, get_audit_repo
-from core.security.iam import Scope, ServiceIdentity
+from core.security.iam import Scope, ServiceIdentity, TokenService
 
 from .dependencies import require_scope
+from .dev_users import authenticate_dev_user
 from .metrics import get_metrics
 
 logger = structlog.get_logger(__name__)
@@ -56,6 +59,56 @@ class SubscriptionResponse(BaseModel):
     status: str
     correlation_id: str
     submitted_at: str
+
+
+class TokenResponse(BaseModel):
+    """Resposta do POST /token (compatível com OAuth2 password flow)."""
+
+    access_token: str
+    token_type: str = "bearer"
+    scopes: list[str] = Field(default_factory=list)
+    tenant_id: str
+
+
+class DossieListItem(BaseModel):
+    """Linha da listagem paginada (GET /subscriptions). Enxuta para a tabela."""
+
+    dossie_id: str
+    tenant_id: str
+    status: str
+    verdict: str | None = None
+    car_number: str
+    producer_cpf_hash: str
+    credit_amount_brl: float
+    credit_purpose: str
+    composite_score: float | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_record(cls, record: DossieRecord) -> DossieListItem:
+        return cls(
+            dossie_id=record.dossie_id,
+            tenant_id=record.tenant_id,
+            status=record.status,
+            verdict=record.verdict,
+            car_number=record.car_number,
+            producer_cpf_hash=record.producer_cpf_hash,
+            credit_amount_brl=record.credit_amount_brl,
+            credit_purpose=record.credit_purpose,
+            composite_score=record.composite_score,
+            created_at=record.created_at.isoformat() if record.created_at else None,
+            updated_at=record.updated_at.isoformat() if record.updated_at else None,
+        )
+
+
+class DossieListResponse(BaseModel):
+    """Envelope paginado da listagem de dossiês."""
+
+    items: list[DossieListItem]
+    total: int
+    page: int
+    pages: int
 
 
 class DossieDetailResponse(BaseModel):
@@ -89,9 +142,37 @@ class AuditTrailEntry(BaseModel):
     timestamp: str
     event_type: str
     subject: str
+    tenant_id: str
+    resource_id: str
     outcome: str
     details: dict[str, Any]
+    previous_hash: str
     entry_hash: str
+    # String canônica exata sobre a qual o SHA-3-256 foi calculado (espelha
+    # core.security.audit.AuditEntry.compute_hash). O frontend recomputa o hash
+    # client-side (Web Crypto não tem SHA-3; usa js-sha3) e compara com entry_hash.
+    # Fornecemos a canônica porque JSON não preserva a repr de floats do Python,
+    # inviabilizando uma reconstrução byte-a-byte no browser.
+    canonical: str
+
+
+def _audit_canonical(event_type: str, event: Any) -> str:
+    """Reproduz a serialização canônica usada no cálculo do entry_hash (core)."""
+    return json.dumps(
+        {
+            "event_id": event.event_id,
+            "timestamp": event.timestamp,
+            "event_type": event_type,
+            "subject": event.subject,
+            "tenant_id": event.tenant_id,
+            "resource_id": event.resource_id,
+            "outcome": event.outcome,
+            "details": event.details,
+            "previous_hash": event.previous_hash,
+        },
+        sort_keys=True,
+        ensure_ascii=True,
+    )
 
 
 class AuditTrailResponse(BaseModel):
@@ -175,6 +256,42 @@ async def create_subscription(
     )
 
 
+@api_router.get("/subscriptions", response_model=DossieListResponse)
+async def list_subscriptions(
+    identity: ServiceIdentity = Depends(require_scope(Scope.SUBSCRIPTION_READ)),
+    session: AsyncSession = Depends(get_session),
+    page: int = Query(1, ge=1, description="Página (1-indexed)"),
+    limit: int = Query(20, ge=1, le=100, description="Itens por página"),
+    status_filter: str | None = Query(None, alias="status", description="Filtra por status"),
+    verdict: str | None = Query(None, description="Filtra por veredicto"),
+) -> DossieListResponse:
+    """
+    Lista paginada dos dossiês do tenant (mais recentes primeiro), com filtros
+    opcionais por status e veredicto. Isolamento por tenant no WHERE.
+    """
+    repo = DossieRepository(session)
+    offset = (page - 1) * limit
+    records = await repo.list_by_tenant(
+        identity.tenant_id,
+        limit=limit,
+        offset=offset,
+        status_filter=status_filter,
+        verdict_filter=verdict,
+    )
+    total = await repo.count_by_tenant(
+        identity.tenant_id,
+        status_filter=status_filter,
+        verdict_filter=verdict,
+    )
+    pages = (total + limit - 1) // limit if total else 0
+    return DossieListResponse(
+        items=[DossieListItem.from_record(r) for r in records],
+        total=total,
+        page=page,
+        pages=pages,
+    )
+
+
 @api_router.get(
     "/subscriptions/{dossie_id}",
     response_model=DossieDetailResponse,
@@ -242,9 +359,13 @@ async def get_audit_trail(
                 timestamp=e.timestamp,
                 event_type=e.event_type.value,
                 subject=e.subject,
+                tenant_id=e.tenant_id,
+                resource_id=e.resource_id,
                 outcome=e.outcome,
                 details=e.details,
+                previous_hash=e.previous_hash,
                 entry_hash=e.entry_hash,
+                canonical=_audit_canonical(e.event_type.value, e),
             )
             for e in relevant
         ],
@@ -268,3 +389,65 @@ async def health() -> dict[str, Any]:
 async def metrics() -> str:
     """Métricas Prometheus-compatible (texto)."""
     return get_metrics().render_prometheus()
+
+
+# ─── Autenticação (público, DEV) ─────────────────────────────────────────────
+
+
+@infra_router.post(
+    "/token",
+    response_model=TokenResponse,
+    responses={401: {"description": "Credenciais inválidas"}},
+    tags=["auth"],
+)
+async def login(
+    request: Request,
+    form: Annotated[OAuth2PasswordRequestForm, Depends()],
+) -> TokenResponse:
+    """
+    Login (OAuth2 password flow) — **apenas DEV**. Valida `username`/`password`
+    contra a lista mock (`dev_users`) e emite um JWT com os scopes do perfil.
+
+    Em produção este endpoint delega para o IdP corporativo (OIDC). O token é
+    devolvido no corpo; o frontend o mantém somente em memória (nunca em storage).
+    """
+    user = authenticate_dev_user(form.username, form.password)
+
+    audit = get_audit_repo()
+    if user is None:
+        await audit.append(
+            event_type=AuditEventType.AUTH_FAILURE,
+            subject=form.username[:64],
+            tenant_id="unknown",
+            resource_id="token",
+            outcome="failure",
+            details={"reason": "invalid_credentials"},
+        )
+        logger.warning("login_failed", username=form.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário ou senha inválidos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_service: TokenService = getattr(request.app.state, "token_service", None) or TokenService()
+    access_token = token_service.issue_user_token(
+        user_id=user.username,
+        tenant_id=user.tenant_id,
+        scopes=list(user.scopes),
+    )
+    await audit.append(
+        event_type=AuditEventType.AUTH_SUCCESS,
+        subject=user.username,
+        tenant_id=user.tenant_id,
+        resource_id="token",
+        outcome="success",
+        details={"scopes": [s.value for s in user.scopes]},
+    )
+    logger.info("login_success", username=user.username, tenant_id=user.tenant_id)
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        scopes=[s.value for s in user.scopes],
+        tenant_id=user.tenant_id,
+    )

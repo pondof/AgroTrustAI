@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Trilha de Auditoria – {{ dossie.id }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 14mm 22mm 14mm;
+      @bottom-center {
+        content: "AgroTrust AI · Trilha de Auditoria · Página " counter(page) " de " counter(pages);
+        font-size: 7pt; color: #6b7280;
+      }
+    }
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1f2937; font-size: 8.5pt; margin: 0; }
+    .brand { border-bottom: 3px solid #15803d; padding-bottom: 6px; margin-bottom: 10px; }
+    .brand .name { font-size: 14pt; font-weight: 700; color: #14532d; }
+    .brand .sub { font-size: 8pt; color: #6b7280; }
+    .doc-title { font-size: 12pt; font-weight: 700; margin: 8px 0 2px; }
+    .doc-meta { font-size: 8pt; color: #6b7280; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 3px 5px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th { background: #f0fdf4; color: #14532d; font-size: 7.5pt; text-transform: uppercase; }
+    tr { page-break-inside: avoid; }
+    .hash { font-family: "Courier New", monospace; word-break: break-all; color: #374151; font-size: 7.5pt; }
+    .details { font-family: "Courier New", monospace; font-size: 7pt; color: #4b5563; white-space: pre-wrap; }
+    .ok { color: #166534; } .fail { color: #991b1b; } .warn { color: #9a3412; }
+    .footer { margin-top: 16px; border-top: 1px solid #e5e7eb; padding-top: 6px; font-size: 7.5pt; color: #6b7280; }
+    .muted { color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="brand">
+    <div class="name">AgroTrust&nbsp;AI</div>
+    <div class="sub">Trilha de Auditoria Imutável (hash chain SHA-3-256)</div>
+  </div>
+
+  <div class="doc-title">Trilha de Auditoria — Dossiê {{ dossie.id }}</div>
+  <div class="doc-meta">
+    Relatório {{ meta.report_id }} · Tenant {{ dossie.tenant_id }} · Gerado em {{ meta.generated_at }}
+    · {{ meta.audit_entries }} entradas
+  </div>
+
+  {% if audit %}
+  <table>
+    <thead>
+      <tr><th>#</th><th>Evento</th><th>Timestamp</th><th>Sujeito</th><th>Resultado</th><th>Detalhes</th><th>Entry hash</th></tr>
+    </thead>
+    <tbody>
+    {% for a in audit %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ a.event_type }}</td>
+        <td>{{ a.timestamp }}</td>
+        <td>{{ a.subject }}</td>
+        <td class="{% if a.outcome == 'success' %}ok{% elif a.outcome == 'failure' %}fail{% else %}warn{% endif %}">{{ a.outcome }}</td>
+        <td class="details">{{ a.details | tojson(indent=None) }}</td>
+        <td class="hash">{{ a.entry_hash }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nenhum evento de auditoria registrado para este dossiê.</p>
+  {% endif %}
+
+  <div class="footer">
+    <div><strong>Hash da cabeça da cadeia:</strong></div>
+    <div class="hash">{{ meta.chain_head_hash or 'sem entradas' }}</div>
+    <div style="margin-top:4px;">
+      {% if meta.signed %}✔ Assinado digitalmente por {{ meta.signer_subject }}.{% else %}⚠ Documento não assinado (dev).{% endif %}
+      Documento gerado automaticamente — LGPD Art. 37.
+    </div>
+  </div>
+</body>
+</html>

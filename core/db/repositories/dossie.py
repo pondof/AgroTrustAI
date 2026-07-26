@@ -272,26 +272,54 @@ class DossieRepository:
         row = result.first()
         return _row_to_record(row) if row is not None else None
 
+    @staticmethod
+    def _list_filters(
+        tenant_id: str,
+        status_filter: str | None,
+        verdict_filter: str | None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Monta a cláusula WHERE compartilhada por list_by_tenant e count_by_tenant."""
+        where = "WHERE tenant_id = :tenant_id"
+        params: dict[str, Any] = {"tenant_id": tenant_id}
+        if status_filter is not None:
+            where += " AND status = :status_filter"
+            params["status_filter"] = status_filter
+        if verdict_filter is not None:
+            where += " AND verdict = :verdict_filter"
+            params["verdict_filter"] = verdict_filter
+        return where, params
+
     async def list_by_tenant(
         self,
         tenant_id: str,
         limit: int = 20,
         offset: int = 0,
         status_filter: str | None = None,
+        verdict_filter: str | None = None,
     ) -> list[DossieRecord]:
         """Lista dossiês do tenant, mais recentes primeiro, com paginação."""
-        where = "WHERE tenant_id = :tenant_id"
-        params: dict[str, Any] = {"tenant_id": tenant_id, "limit": limit, "offset": offset}
-        if status_filter is not None:
-            where += " AND status = :status_filter"
-            params["status_filter"] = status_filter
-
+        where, params = self._list_filters(tenant_id, status_filter, verdict_filter)
+        params.update({"limit": limit, "offset": offset})
         stmt = text(
             f"SELECT {_COLUMNS} FROM dossies {where} "  # noqa: S608
             "ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
         )
         result = await self._session.execute(stmt, params)
         return [_row_to_record(row) for row in result.fetchall()]
+
+    async def count_by_tenant(
+        self,
+        tenant_id: str,
+        status_filter: str | None = None,
+        verdict_filter: str | None = None,
+    ) -> int:
+        """Conta os dossiês do tenant que casam com os filtros (para paginação)."""
+        where, params = self._list_filters(tenant_id, status_filter, verdict_filter)
+        stmt = text(f"SELECT COUNT(*) AS total FROM dossies {where}")  # noqa: S608
+        result = await self._session.execute(stmt, params)
+        row = result.first()
+        assert row is not None  # COUNT(*) sempre retorna uma linha
+        return int(row._mapping["total"] or 0)
 
     async def get_stats(self, tenant_id: str) -> DossieStatsDTO:
         """Agrega contadores e médias para o dashboard do tenant."""

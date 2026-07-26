@@ -29,6 +29,7 @@ x-app-env: &app-env
   GOV_GEE_BASE_URL: http://agrotrust-mock-gee:8002
   GOV_DATAPREV_BASE_URL: http://agrotrust-mock-dataprev:8003
   GOV_OPEN_FINANCE_BASE_URL: http://agrotrust-mock-open-finance:8004
+  REPORT_SERVICE_URL: http://agrotrust-report-service:8020
 
 services:
 
@@ -133,3 +134,52 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  # ─── Report Service (geração/assinatura de PDF) ────────────────────────────
+  report-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.report-service
+    image: agrotrust/report-service:dev
+    container_name: agrotrust-report-service
+    networks: [agrotrust-net]
+    ports:
+      - "8020:8020"
+    environment:
+      <<: *app-env
+      SERVICE_NAME: agrotrust-report-service
+      # PKCS12_PATH aponta para um cert real em prod; em dev o serviço gera um
+      # self-signed. Deixe REPORT_ALLOW_UNSIGNED=1 apenas se rodar sem PyHanko.
+      REPORT_ALLOW_UNSIGNED: "0"
+    restart: unless-stopped
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8020/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  # ─── Frontend (React SPA servida por nginx) ────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        # Vazio → o nginx faz proxy de /api e /token para o gateway (same-origin).
+        VITE_API_BASE_URL: ""
+    image: agrotrust/frontend:dev
+    container_name: agrotrust-frontend
+    networks: [agrotrust-net]
+    ports:
+      - "5173:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

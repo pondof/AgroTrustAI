@@ -13,16 +13,21 @@ que w_esg + w_financial + w_security == 1.0 (validado no request e no CHECK do b
 
 from __future__ import annotations
 
+import io
+import os
 from typing import Any
 
+import httpx
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db.engine import get_session
 from core.db.repositories.dossie import DossieRepository, DossieStatsDTO
 from core.db.repositories.params import RiskParams, RiskParamsCache, RiskParamsRepository
+from core.security.audit import AuditEventType, get_audit_repo
 from core.security.iam import Scope, ServiceIdentity
 
 from .dependencies import require_scope
@@ -32,6 +37,11 @@ logger = structlog.get_logger(__name__)
 params_router = APIRouter(prefix="/api/v1", tags=["params", "analytics"])
 
 _WEIGHT_SUM_TOLERANCE = 1e-6
+
+# URL interna do report-service (HTTP S2S). Sobrescrita no compose para o hostname
+# do container. Default aponta para o dev local (`make report-up`).
+REPORT_SERVICE_URL = os.environ.get("REPORT_SERVICE_URL", "http://localhost:8020")
+_REPORT_TIMEOUT_SEC = 30.0
 
 
 # ─── Modelos ──────────────────────────────────────────────────────────────────
@@ -183,3 +193,71 @@ async def get_stats(
 ) -> DossieStatsDTO:
     """Estatísticas agregadas dos dossiês do tenant (dashboard)."""
     return await DossieRepository(session).get_stats(identity.tenant_id)
+
+
+# ─── Relatório PDF (proxy para o report-service) ─────────────────────────────
+
+
+@params_router.post(
+    "/reports/{dossie_id}",
+    responses={
+        200: {"content": {"application/pdf": {}}, "description": "PDF assinado"},
+        404: {"description": "Dossiê não encontrado"},
+        502: {"description": "Falha no report-service"},
+        504: {"description": "Timeout no report-service"},
+    },
+)
+async def generate_report(
+    dossie_id: str,
+    identity: ServiceIdentity = Depends(require_scope(Scope.SUBSCRIPTION_READ)),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
+    """
+    Gera o relatório de compliance (PDF assinado) do dossiê.
+
+    Valida o acesso (isolamento por tenant) e delega a geração ao report-service
+    interno (HTTP S2S), fazendo proxy dos bytes do PDF de volta ao cliente. Registra
+    a exportação na trilha de auditoria (LGPD Art. 37 – operação sobre dado pessoal).
+    """
+    # Autoriza no gateway: garante que o dossiê existe e pertence ao tenant.
+    record = await DossieRepository(session).get_by_id(dossie_id, identity.tenant_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Dossiê '{dossie_id}' não encontrado")
+
+    payload = {
+        "dossie_id": dossie_id,
+        "tenant_id": identity.tenant_id,
+        "requested_by": identity.subject,
+    }
+    url = f"{REPORT_SERVICE_URL}/reports/{dossie_id}"
+    try:
+        async with httpx.AsyncClient(timeout=_REPORT_TIMEOUT_SEC) as http:
+            resp = await http.post(url, json=payload)
+    except httpx.TimeoutException as exc:
+        logger.error("report_service_timeout", dossie_id=dossie_id)
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="Timeout ao gerar o relatório") from exc
+    except httpx.HTTPError as exc:
+        logger.error("report_service_unreachable", dossie_id=dossie_id, error=str(exc))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="report-service indisponível") from exc
+
+    if resp.status_code != status.HTTP_200_OK:
+        logger.error("report_service_error", dossie_id=dossie_id, upstream_status=resp.status_code)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Falha ao gerar o relatório")
+
+    pdf_bytes = resp.content
+    await get_audit_repo().append(
+        event_type=AuditEventType.PII_EXPORTED,
+        subject=identity.subject,
+        tenant_id=identity.tenant_id,
+        resource_id=dossie_id,
+        outcome="success",
+        details={"artifact": "compliance_report_pdf", "bytes": len(pdf_bytes)},
+    )
+    logger.info("report_generated", dossie_id=dossie_id, bytes=len(pdf_bytes))
+
+    filename = f"agrotrust_{dossie_id}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -47,7 +47,9 @@ CREATE INDEX IF NOT EXISTS dossies_status_idx    ON dossies (tenant_id, status);
 CREATE TABLE IF NOT EXISTS audit_log (
     id             BIGSERIAL     PRIMARY KEY,
     event_id       UUID          NOT NULL UNIQUE,
-    timestamp      TIMESTAMPTZ   NOT NULL,
+    -- ISO-8601 UTC como TEXT: o entry_hash é calculado sobre esta string exata,
+    -- então ela deve round-trip byte-a-byte (TIMESTAMPTZ normalizaria o formato).
+    timestamp      TEXT          NOT NULL,
     event_type     VARCHAR(60)   NOT NULL,
     subject        VARCHAR(200)  NOT NULL,
     tenant_id      VARCHAR(100)  NOT NULL,
