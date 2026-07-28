@@ -96,7 +96,9 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      # Schema autoritativo da Fase 2 (o antigo docker/init-db.sql está obsoleto).
+      # Mesmo arquivo aplicado por `make migrate`, e idempotente (IF NOT EXISTS).
+      - ../core/db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       POSTGRES_DB: agrotrust
       POSTGRES_USER: agrotrust

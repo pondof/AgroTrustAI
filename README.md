@@ -14,6 +14,9 @@ imutável (hash chain) e persistência PostgreSQL.
 ## Ambiente completo (um comando)
 
 ```bash
+python3 -m venv venv 
+python3 venv/bin/activate
+make install
 make stack-up      # infra (Kafka/PG/Redis) + mocks + aplicação
 make migrate       # aplica core/db/migrations/001_initial.sql no PostgreSQL
 ```

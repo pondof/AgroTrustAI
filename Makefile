@@ -2,8 +2,8 @@
         app-build app-up app-down app-logs migrate stack-up stack-down \
         frontend-dev frontend-build frontend-test report-up report-build report-test
 
-PYTHON := python3.11
-PIP    := pip install --break-system-packages
+PYTHON := $(shell command -v python3.11 >/dev/null 2>&1 && echo python3.11 || echo python3)
+PIP    := pip install
 NPM    := npm --prefix frontend
 
 # Detecta o Compose disponível: plugin v2 ("docker compose") ou binário v1 ("docker-compose").

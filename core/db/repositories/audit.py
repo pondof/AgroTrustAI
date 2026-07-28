@@ -64,9 +64,13 @@ class PersistedAuditRepository:
     ) -> AuditEntry:
         async with self._append_lock, self._session_factory() as session:
             previous_hash = await self._head_hash(session)
+            # asyncpg exige datetime para a coluna timestamptz; o AuditEntry guarda a
+            # forma ISO (base do hash da cadeia). Capturamos o mesmo instante uma vez
+            # para que hash e valor persistido fiquem consistentes no round-trip.
+            now = datetime.now(UTC)
             entry = AuditEntry(
                 event_id=str(uuid.uuid4()),
-                timestamp=datetime.now(UTC).isoformat(),
+                timestamp=now.isoformat(),
                 event_type=event_type,
                 subject=subject,
                 tenant_id=tenant_id,
@@ -88,7 +92,7 @@ class PersistedAuditRepository:
                 stmt,
                 {
                     "event_id": entry.event_id,
-                    "timestamp": entry.timestamp,
+                    "timestamp": now,
                     "event_type": entry.event_type.value,
                     "subject": entry.subject,
                     "tenant_id": entry.tenant_id,
